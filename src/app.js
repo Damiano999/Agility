@@ -46,48 +46,49 @@ function pointerDown(e){const p=coords(e);if(state.tool==='route'){const match=n
 function pointerMove(e){const p=coords(e);$('#coord').textContent=`${(p.x*state.length).toFixed(1)} × ${(p.y*state.width).toFixed(1)} ${state.unit}`;if(dragCurve){const {w,h}=dim(),scale=Math.min(w,h),dx=(p.x-dragCurve.start.x)*w,dy=(p.y-dragCurve.start.y)*h;state.routeBends[dragCurve.key]=Math.max(-.28,Math.min(.28,dragCurve.bend+(dx*dragCurve.nx+dy*dragCurve.ny)/scale));dragCurve.moved=true;draw();return}if(!drag)return;const o=state.obstacles.find(o=>o.id===drag.id);if(!o)return;if(!drag.moved){saveHistory();drag.moved=true}o.x=Math.max(.06,Math.min(.94,p.x-drag.dx));o.y=Math.max(.08,Math.min(.92,p.y-drag.dy));draw();updateRouteList()}
 function pointerUp(){if(drag?.moved||dragCurve?.moved)markDirty();drag=null;dragCurve=null}
 function shuffle(list){for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]]}return list}
-function randomCourse(mode){
- saveHistory();const competition=mode==='competition',rand=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.floor(Math.random()*a.length)];
- const randTunnel=short=>({type:'tunnel',length:short?3.5:rand(4.5,6),bend:pick([0,0,15,30,45,60,75])});
- let pool,rowSizes;
- if(competition){
-  pool=[...Array(11)].map(()=>({type:'jump'}));pool.push({type:'aFrame'},{type:'dogWalk'},{type:'seesaw'},{type:'weave'},randTunnel(true),randTunnel(false),{type:'tire'},{type:'wall'},{type:'longJump'});
-  if(Math.random()<.72)pool[ Math.floor(Math.random()*11) ]={type:'spread'};
-  rowSizes=[4,4,4,4,4];
- }else{
-  pool=[...Array(14)].map(()=>({type:'jump'}));pool.push(randTunnel(true),randTunnel(false),randTunnel(false),randTunnel(false));rowSizes=[5,5,4,4];
+function courseObstaclePool(mode,count){
+ const rand=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.floor(Math.random()*a.length)],tunnel=(short=false)=>({type:'tunnel',length:short?3.5:rand(4.5,6),bend:pick([0,0,15,30,45,60,75,90])});
+ let pool=[];
+ if(mode==='training'){pool=[...Array(count-4)].map(()=>({type:'jump'}));pool.push(tunnel(true),tunnel(),tunnel(),tunnel())}
+ else{
+  pool=[...Array(7)].map(()=>({type:'jump'}));pool.push({type:'aFrame'},{type:'dogWalk'},{type:'seesaw'},{type:'weave'},tunnel(true),{type:'tire'},{type:'wall'},{type:'longJump'});
+  while(pool.length<count)pool.push(Math.random()<.78?{type:'jump'}:tunnel());
+  if(Math.random()<.55){const jump=pool.findIndex(o=>o.type==='jump');if(jump>=0)pool[jump]={type:'spread'}}
  }
- // Keep the opening and finish as single jumps; randomize every obstacle between them.
- const middle=shuffle([...pool]);for(let i=0;i<2;i++){const jump=middle.findIndex(o=>o.type==='jump');middle.splice(jump,1)}pool=[{type:'jump'},...middle,{type:'jump'}];
- let rows=[],offset=0;for(const size of rowSizes){rows.push(pool.slice(offset,offset+size));offset+=size}rows.forEach((row,r)=>{const from=r===0?1:0,to=r===rows.length-1?row.length-1:row.length,middle=shuffle(row.slice(from,to));for(let i=from;i<to;i++)row[i]=middle[i-from]});
+ shuffle(pool);const first=pool.findIndex(o=>o.type==='jump'),last=pool.map(o=>o.type).lastIndexOf('jump');
+ if(first>0)[pool[0],pool[first]]=[pool[first],pool[0]];if(last>=0&&last<pool.length-1)[pool[pool.length-1],pool[last]]=[pool[last],pool[pool.length-1]];
+ return pool;
+}
+function rotatedObstacleBox(o,x,y,rotation){const s=obstacleFootprint(o),a=rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a);return[[-s.width/2,-s.depth/2],[s.width/2,-s.depth/2],[s.width/2,s.depth/2],[-s.width/2,s.depth/2]].map(([px,py])=>({x:x+px*c-py*sn,y:y+px*sn+py*c}))}
+function boxesOverlap(a,b,pad=.12){for(const poly of[a,b])for(let i=0;i<poly.length;i++){const p=poly[i],q=poly[(i+1)%poly.length],ax=-(q.y-p.y),ay=q.x-p.x,len=Math.hypot(ax,ay)||1,nx=ax/len,ny=ay/len;const aa=a.map(v=>v.x*nx+v.y*ny),bb=b.map(v=>v.x*nx+v.y*ny);if(Math.max(...aa)+pad<Math.min(...bb)||Math.max(...bb)+pad<Math.min(...aa))return false}return true}
+function randomCourse(mode,count){
+ saveHistory();const competition=mode==='competition',rand=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.floor(Math.random()*a.length)],pool=courseObstaclePool(mode,count),n=pool.length;
  const span=o=>o.type==='weave'?7.2:o.type==='tunnel'?Math.hypot(...(()=>{const p=tunnelPath(o.length,o.bend,1);return[p.at(-1).x-p[0].x,p.at(-1).y-p[0].y]})()):obstacleFootprint(o).depth;
  state.length=40;state.width=24;state.unit='m';state.gridSize=2;
- const spans=rows.map(row=>row.map(span)),laneGaps=Array.from({length:rows.length-1},()=>competition?rand(5.15,5.65):rand(5.4,6.4));
- const totalLane=laneGaps.reduce((a,b)=>a+b,0),laneStart=(24-totalLane)/2,lanes=[laneStart];laneGaps.forEach(g=>lanes.push(lanes.at(-1)+g));
- let course=[],placed=false;
- // Retry random approaches when a row would leave the field; every inter-obstacle dog-path gap stays in range.
- for(let attempt=0;attempt<100&&!placed;attempt++){
-  const candidate=[],dirs=rows.map((_,i)=>i%2?-1:1);let entryX=rand(3.2,7.2),entryY=lanes[0],valid=true;
-  for(let r=0;r<rows.length&&valid;r++){
-   const row=rows[r],dir=dirs[r],ys=row.map((_,i)=>lanes[r]+(i===0||i===row.length-1?0:rand(-.7,.7)));
-   // Later rows start near the previous exit, with a randomized diagonal approach.
-   if(r){const dy=lanes[r]-lanes[r-1],target=rand(Math.max(5.25,dy),Math.min(7.2,dy+1.25)),dx=Math.sqrt(Math.max(0,target*target-dy*dy))*pick([-1,1]);entryX+=dx;entryY=lanes[r]}
-   let portalX=entryX;
-   for(let i=0;i<row.length;i++){
-    const item=row[i],length=spans[r][i],centerX=portalX+dir*length/2,centerY=ys[i];
-    if(centerX-length/2<.65||centerX+length/2>39.35||centerY<1.1||centerY>22.9){valid=false;break}
-    const rotation=item.type==='weave'?(dir>0?0:180):(dir>0?-90:90);
-    candidate.push({...item,x:centerX/40,y:centerY/24,rotation,n:candidate.length+1,id:id(),label:''});
-    if(i<row.length-1){const dy=ys[i+1]-ys[i],target=rand(5.15,6.85),dx=Math.sqrt(Math.max(.1,target*target-dy*dy));portalX=centerX+dir*(length/2+dx)}
-    else {entryX=centerX+dir*length/2;entryY=centerY}
-   }
+ let course=null;
+ // Build a free-form path from random start points and turn sequences. Reject edge exits and equipment collisions.
+ for(let attempt=0;attempt<2400&&!course;attempt++){
+  const gaps=Array.from({length:n-1},()=>rand(5.2,competition?6.9:7.6)),bearings=[rand(-Math.PI,Math.PI)];
+  const turns=[-145,-120,-95,-70,-45,-25,25,45,70,95,120,145];
+  for(let i=1;i<n-1;i++)bearings.push(bearings[i-1]+pick(turns)*Math.PI/180);
+  // Smooth obstacle axes between the approach and departure directions.
+  const axes=pool.map((_,i)=>{if(i===0)return bearings[0];if(i===n-1)return bearings.at(-1);const a=bearings[i-1],b=bearings[i],x=Math.cos(a)+Math.cos(b),y=Math.sin(a)+Math.sin(b);return Math.hypot(x,y)<.15?b:Math.atan2(y,x)});
+  const spans=pool.map(span),entry={x:rand(2.3,37.7),y:rand(2.3,21.7)},candidate=[],boxes=[];let portal=entry,valid=true;
+  for(let i=0;i<n;i++){
+   const item=pool[i],axis=axes[i],center={x:portal.x+Math.cos(axis)*spans[i]/2,y:portal.y+Math.sin(axis)*spans[i]/2};
+   const rotation=(axis*180/Math.PI-(item.type==='weave'?0:90)),box=rotatedObstacleBox(item,center.x,center.y,rotation);
+   if(box.some(p=>p.x<.55||p.x>39.45||p.y<.55||p.y>23.45)){valid=false;break}
+   if(boxes.some(other=>boxesOverlap(box,other,.18))){valid=false;break}
+   boxes.push(box);candidate.push({...item,x:center.x/40,y:center.y/24,rotation,n:i+1,id:id(),label:''});
+   portal={x:center.x+Math.cos(axis)*spans[i]/2,y:center.y+Math.sin(axis)*spans[i]/2};
+   if(i<n-1)portal={x:portal.x+Math.cos(bearings[i])*gaps[i],y:portal.y+Math.sin(bearings[i])*gaps[i]};
   }
-  if(valid&&candidate.length===pool.length){course=candidate;placed=true}
+  if(valid&&candidate.length===n)course=candidate;
  }
- if(!placed)throw Error('Nie udało się ułożyć losowego toru na planszy. Spróbuj ponownie.');
+ if(!course)throw Error('Nie udało się bezkolizyjnie ułożyć toru. Spróbuj ponownie.');
  state.obstacles=course;state.route=[];state.routeBends={};state.selected=null;state.tool='select';state.view='2d';state.showRoute=true;state.showNumbers=true;state.showDistances=true;$('#leftPanel').classList.remove('mobile-open');$('#showTools').classList.remove('active');
- state.title=competition?'Tor losowy — standard FCI':'Tor treningowy — skoki i tunele';sync();draw();markDirty();
- toast(competition?'Wylosowano tor 20 przeszkód. Zweryfikuj go przed treningiem.':'Wylosowano treningowy tor skokowo-tunelowy.');
+ state.title=competition?`Tor losowy — ${count} przeszkód`:`Tor treningowy — ${count} przeszkód`;sync();draw();markDirty();
+ toast(competition?`Wylosowano tor ${count} przeszkód. Zweryfikuj przed treningiem.`:`Wylosowano treningowy tor ${count} przeszkód.`);
 }
 function addObstacle(type){if(!names[type])return showError('Nieznany typ przeszkody.');if(state.obstacles.length>=99)return showError('Możesz dodać maksymalnie 99 ponumerowanych przeszkód.');const used=new Set(state.obstacles.map(o=>Number(o.n)));let n=1;while(used.has(n)&&n<=99)n++;if(n>99)return showError('Brak wolnego numeru przeszkody.');saveHistory();const o={id:id(),type,x:.5,y:.5,n,label:'',rotation:0};if(type==='tunnel'){o.length=4.5;o.bend=0}state.obstacles.push(o);state.selected=o.id;state.tool='select';sync();draw();toast(`${names[type]} dodana do planszy`)}
 function deleteSelected(){if(!state.selected)return;saveHistory();state.obstacles=state.obstacles.filter(o=>o.id!==state.selected);state.selected=null;updateSelection();updateRouteList();draw();toast('Usunięto przeszkodę')}
@@ -103,7 +104,7 @@ async function setView(view){if(view==='2d'){state.view='2d';sync();$('#hint').i
 $('#tools').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.tool)setTool(b.dataset.tool);if(b.dataset.add)addObstacle(b.dataset.add)});
 document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
 canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp);canvas.addEventListener('dblclick',()=>{if(state.tool==='route')setTool('select')});
-$('#randomCourse').onclick=()=>$('#randomCourseDialog').showModal();$('#randomCourseDialog').addEventListener('click',e=>{const button=e.target.closest('[data-random-mode]');if(!button)return;const mode=button.dataset.randomMode;$('#randomCourseDialog').close();randomCourse(mode)});
+$('#randomCourse').onclick=()=>$('#randomCourseDialog').showModal();$('#randomCourseDialog').addEventListener('click',e=>{const button=e.target.closest('[data-random-mode]');if(!button)return;const field=$('#courseObstacleCount'),count=Number(field.value);if(!Number.isInteger(count)||count<15||count>20){field.setCustomValidity('Wybierz od 15 do 20 przeszkód.');field.reportValidity();return}field.setCustomValidity('');const mode=button.dataset.randomMode;$('#randomCourseDialog').close();try{randomCourse(mode,count)}catch(error){showError(error.message)}});
 $('#undo').onclick=undo;$('#redo').onclick=redo;$('#exportPng').onclick=exportPNG;$('#saveJson').onclick=exportJSON;$('#importJson').onclick=()=>$('#filePicker').click();$('#filePicker').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onerror=()=>showError('Nie udało się odczytać pliku projektu.');rd.onload=()=>{const before={...state};try{const q=JSON.parse(rd.result);if(Array.isArray(q.obstacles))q.obstacles=q.obstacles.filter(o=>!['chute','triple'].includes(o.type));if(!Array.isArray(q.obstacles)||q.obstacles.length>99)throw Error('Plik musi zawierać listę maksymalnie 99 przeszkód.');if(!Number.isFinite(q.length)||q.length<5||q.length>100||!Number.isFinite(q.width)||q.width<5||q.width>100)throw Error('Wymiary planszy muszą mieścić się w zakresie 5–100.');if(q.unit&&!['m','ft'].includes(q.unit))throw Error('Nieznana jednostka miary.');if(!Array.isArray(q.route))q.route=[];if(q.obstacles.some(o=>!names[o.type]&&!['table','marker','chute','triple'].includes(o.type)))throw Error('Plik zawiera nieznany typ przeszkody.');if(q.obstacles.some(o=>![o.x,o.y].every(Number.isFinite)||o.x<0||o.x>1||o.y<0||o.y>1))throw Error('Położenie przeszkody poza planszą.');saveHistory();Object.assign(state,q);state.routeBends||={};state.showDistances=!!q.showDistances;state.obstacles=state.obstacles.filter(o=>!['table','marker','chute','triple'].includes(o.type));const ids=new Set();for(const o of state.obstacles){if(!o.id||ids.has(o.id))o.id=id();ids.add(o.id)}state.view=state.view==='3d'?'3d':'2d';state.tool='select';const changed=normalizeOrderNumbers();state.selected=null;sync();if(state.view==='3d')setView('3d');else draw();autosave();if(changed)showError('Projekt miał powtórzone numery. Nadałem im unikalne numery.');else toast('Projekt wczytany')}catch(error){Object.assign(state,before);sync();draw();showError(`Nie udało się wczytać projektu: ${error.message}`)}};rd.readAsText(f);e.target.value=''};
 $('#gridSwitch').onclick=()=>toggle('gridSwitch','grid');$('#routeSwitch').onclick=()=>toggle('routeSwitch','showRoute');$('#routeSwitch2').onclick=()=>toggle('routeSwitch2','showRoute');$('#numberSwitch').onclick=()=>toggle('numberSwitch','showNumbers');$('#distanceSwitch').onclick=()=>toggle('distanceSwitch','showDistances');$('#clearRoute').onclick=()=>{if(!Object.keys(state.routeBends||{}).length)return;saveHistory();state.routeBends={};draw();updateRouteList();markDirty();toast('Przywrócono automatyczne łuki')};$('#clearCourse').onclick=()=>{saveHistory();state.obstacles=[];state.route=[];state.routeBends={};state.selected=null;sync();draw();markDirty();toast('Plansza wyczyszczona')};$('#deleteObstacle').onclick=deleteSelected;
 $('#obstacleNum').onchange=e=>{const o=state.obstacles.find(o=>o.id===state.selected),number=Math.max(1,Math.min(99,Math.floor(+e.target.value||1)));if(!o)return;if(numberInUse(number,o.id)){e.target.value=o.n;showError(`Numer ${number} jest już przypisany do innej przeszkody.`);return}saveHistory();o.n=number;draw();updateRouteList();markDirty()};$('#obstacleRotation').onfocus=()=>saveHistory();$('#obstacleRotation').oninput=e=>{const o=state.obstacles.find(o=>o.id===state.selected);if(o){o.rotation=Math.max(-180,Math.min(180,+e.target.value||0));draw();markDirty()}};$('#tunnelLength').onpointerdown=()=>saveHistory();$('#tunnelLength').oninput=e=>{const o=state.obstacles.find(o=>o.id===state.selected);if(o?.type==='tunnel'){o.length=+e.target.value;$('#tunnelLengthValue').textContent=`${o.length.toFixed(1).replace('.',',')} m`;draw();markDirty()}};$('#tunnelBend').onpointerdown=()=>saveHistory();$('#tunnelBend').oninput=e=>{const o=state.obstacles.find(o=>o.id===state.selected);if(o?.type==='tunnel'){o.bend=+e.target.value;$('#tunnelBendValue').textContent=o.bend?`${o.bend}°`:'Prosty';draw();markDirty()}};$('#obstacleLabel').oninput=e=>{const o=state.obstacles.find(o=>o.id===state.selected);if(o){o.label=e.target.value;draw();updateRouteList();markDirty()}};
