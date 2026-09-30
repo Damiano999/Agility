@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { obstacleFootprint } from './obstacle-icons.js';
 
 const obstacleColors = {
   jump: '#f2aa42', spread: '#f2aa42', triple: '#f2aa42', wall: '#ed7863', longJump: '#ef9c4e',
@@ -75,10 +76,27 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
     }
     return new THREE.CatmullRomCurve3(pts);
   }
-  function tunnelTraversal(s, nodes, index, L, W) {
-    const obstacle = nodes[index], length = Math.max(3, Math.min(6, Number(obstacle.length) || 4.5));
+  function obstacleTraversal(s, nodes, index, L, W) {
+    const obstacle = nodes[index];
     const rotation = (Number(obstacle.rotation) || 0) * Math.PI / 180;
-    const localPoints = makeTunnelCurve(length, obstacle.bend).getPoints(40);
+    const { depth } = obstacleFootprint(obstacle);
+    let localPoints;
+    if (obstacle.type === 'tunnel') localPoints = makeTunnelCurve(Math.max(3, Math.min(6, Number(obstacle.length) || 4.5)), obstacle.bend).getPoints(40);
+    else if (obstacle.type === 'weave') localPoints = [new THREE.Vector3(-3.6, .55, 0), ...Array.from({ length: 12 }, (_, i) => new THREE.Vector3((i - 5.5) * .6, .55, i % 2 ? .27 : -.27)), new THREE.Vector3(3.6, .55, 0)];
+    else {
+      const steps = ['aFrame', 'dogWalk', 'seesaw'].includes(obstacle.type) ? 32 : 1;
+      localPoints = Array.from({ length: steps + 1 }, (_, i) => {
+        const z = (i / steps - .5) * depth, abs = Math.abs(z);
+        let y = obstacle.type === 'aFrame' ? .08 + 1.7 * Math.max(0, 1 - abs / (depth / 2))
+          : obstacle.type === 'dogWalk' ? .08 + 1.21 * Math.max(0, 1 - Math.max(0, abs - 1.825) / 3.65)
+            : obstacle.type === 'seesaw' ? .64 - z * Math.sin(.08)
+              : obstacle.type === 'wall' ? .65 : obstacle.type === 'longJump' ? .2
+                : obstacle.type === 'tire' ? .8 : obstacle.type === 'tunnel' ? .32
+                  : obstacle.type === 'chute' ? .28 : obstacle.type === 'spread' ? .65
+                    : obstacle.type === 'triple' ? .7 : .55;
+        return new THREE.Vector3(0, y, z);
+      });
+    }
     const cx = (obstacle.x - .5) * L, cz = (obstacle.y - .5) * W;
     const points = localPoints.map(p => new THREE.Vector3(cx + p.x * Math.cos(rotation) - p.z * Math.sin(rotation), p.y, cz + p.x * Math.sin(rotation) + p.z * Math.cos(rotation)));
     const center = item => new THREE.Vector3((item.x - .5) * L, .32, (item.y - .5) * W);
@@ -229,8 +247,8 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
       for (let i = 0; i < ordered.length - 1; i++) {
         const a = ordered[i], b = ordered[i + 1], prev = ordered[i - 1] || a, next = ordered[i + 2] || b;
         const unitScale = s.unit === 'ft' ? .3048 : 1, L = s.length * unitScale, W = s.width * unitScale;
-        const ta = a.type === 'tunnel' ? tunnelTraversal(s, ordered, i, L, W) : null;
-        const tb = b.type === 'tunnel' ? tunnelTraversal(s, ordered, i + 1, L, W) : null;
+        const ta = obstacleTraversal(s, ordered, i, L, W);
+        const tb = obstacleTraversal(s, ordered, i + 1, L, W);
         const p0 = ta ? ta.exit.clone() : new THREE.Vector3((a.x - .5) * L, .08, (a.y - .5) * W);
         const p3 = tb ? tb.entry.clone() : new THREE.Vector3((b.x - .5) * L, .08, (b.y - .5) * W);
         const pp = new THREE.Vector3((prev.x - .5) * L, .08, (prev.y - .5) * W);
@@ -262,6 +280,12 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
           const mid = new THREE.Vector3((centerA.x + centerB.x) / 2, .28, (centerA.z + centerB.z) / 2), label = createLabel(`${amount.toFixed(1)} ${s.unit}`, '#fff5c6', '#28433b');
           label.position.set(mid.x, .28, mid.z); label.scale.set(1.1, .28, 1); routeGroup.add(label);
         }
+      }
+      if (s.showRoute && ordered.length) {
+        const first = obstacleTraversal(s, ordered, 0, s.length * (s.unit === 'ft' ? .3048 : 1), s.width * (s.unit === 'ft' ? .3048 : 1));
+        const inside = new THREE.CatmullRomCurve3(first.points);
+        const line = new THREE.Mesh(new THREE.TubeGeometry(inside, Math.max(8, first.points.length * 2), .035, 6, false), mat(s.path || '#f07851', .48));
+        line.material.depthTest = false; line.renderOrder = 5; routeGroup.add(line);
       }
     }
   }
