@@ -272,13 +272,15 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
           }
         }
         if (s.showDistances) {
-          const centerA = new THREE.Vector3((a.x - .5) * L, .12, (a.y - .5) * W), centerB = new THREE.Vector3((b.x - .5) * L, .12, (b.y - .5) * W);
-          const meters = Math.hypot((b.x - a.x) * L, (b.y - a.y) * W), amount = s.unit === 'ft' ? meters / .3048 : meters;
-          const chord = new THREE.BufferGeometry().setFromPoints([centerA, centerB]);
-          routeGroup.add(new THREE.Line(chord, new THREE.LineDashedMaterial({ color: '#63d4bf', dashSize: .28, gapSize: .18, transparent: true, opacity: .88 })));
-          routeGroup.children.at(-1).computeLineDistances();
-          const mid = new THREE.Vector3((centerA.x + centerB.x) / 2, .28, (centerA.z + centerB.z) / 2), label = createLabel(`${amount.toFixed(1)} ${s.unit}`, '#fff5c6', '#28433b');
-          label.position.set(mid.x, .28, mid.z); label.scale.set(1.1, .28, 1); routeGroup.add(label);
+          const samples = curve.getPoints(40);
+          let meters = 0;
+          for (let j = 1; j < samples.length; j++) meters += samples[j].distanceTo(samples[j - 1]);
+          const amount = s.unit === 'ft' ? meters / .3048 : meters;
+          const measurement = new THREE.BufferGeometry().setFromPoints(samples);
+          const measureLine = new THREE.Line(measurement, new THREE.LineDashedMaterial({ color: '#63d4bf', dashSize: .28, gapSize: .18, transparent: true, opacity: .88 }));
+          measureLine.computeLineDistances(); routeGroup.add(measureLine);
+          const mid = curve.getPoint(.5), label = createLabel(String(amount.toFixed(1)) + ' ' + s.unit, '#fff5c6', '#28433b');
+          label.position.set(mid.x, mid.y + .62, mid.z); label.scale.set(1.1, .28, 1); routeGroup.add(label);
         }
       }
       if (s.showRoute && ordered.length) {
