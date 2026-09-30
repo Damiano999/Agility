@@ -75,6 +75,20 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
     }
     return new THREE.CatmullRomCurve3(pts);
   }
+  function tunnelTraversal(s, nodes, index, L, W) {
+    const obstacle = nodes[index], length = Math.max(3, Math.min(6, Number(obstacle.length) || 4.5));
+    const rotation = (Number(obstacle.rotation) || 0) * Math.PI / 180;
+    const localPoints = makeTunnelCurve(length, obstacle.bend).getPoints(40);
+    const cx = (obstacle.x - .5) * L, cz = (obstacle.y - .5) * W;
+    const points = localPoints.map(p => new THREE.Vector3(cx + p.x * Math.cos(rotation) - p.z * Math.sin(rotation), p.y, cz + p.x * Math.sin(rotation) + p.z * Math.cos(rotation)));
+    const center = item => new THREE.Vector3((item.x - .5) * L, .32, (item.y - .5) * W);
+    const before = nodes[index - 1], after = nodes[index + 1];
+    let enterFromStart = true;
+    if (before) enterFromStart = points[0].distanceTo(center(before)) < points.at(-1).distanceTo(center(before));
+    else if (after) enterFromStart = points.at(-1).distanceTo(center(after)) < points[0].distanceTo(center(after));
+    if (!enterFromStart) points.reverse();
+    return { entry: points[0], exit: points.at(-1), points };
+  }
   function addTunnel(group, obstacle) {
     const length = Math.max(3, Math.min(6, Number(obstacle.length) || 4.5));
     const curve = makeTunnelCurve(length, obstacle.bend);
@@ -115,22 +129,33 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
       }
       case 'aFrame': addRamp(g, 0, -1); addRamp(g, 0, 1); break;
       case 'dogWalk': {
+        const rampAngle = Math.asin(1.2 / 3.65);
         addBox(g, teal, 0, 1.24, 0, .3, .1, 3.65);
         for (const sign of [-1, 1]) {
-          // The inner end of each ramp must meet the 1.2 m high deck;
-          // the outer end slopes down to ground level.
-          const ramp = addBox(g, teal, 0, .64, sign * 3.5, .3, .09, 3.65); ramp.rotation.x = sign * Math.asin(1.2 / 3.65);
-          addBox(g, '#f1bf55', 0, .19, sign * 4.95, .3, .035, .9);
-          for (let i = 0; i < 10; i++) { const z = sign * (1.9 + i * .3), y = .55 + (.62 * (1 - i / 10)); addBox(g, '#d4eee0', 0, y, z, .29, .025, .035); }
-          addBox(g, charcoal, 0, .55, sign * 2.4, .07, 1.1, .07);
+          // Inner ramp ends meet the raised deck; outer ends meet the ground.
+          const ramp = addBox(g, teal, 0, .64, sign * 3.5, .3, .09, 3.65); ramp.rotation.x = sign * rampAngle;
+          const contactY = .64 - (4.95 - 3.5) * Math.sin(rampAngle);
+          const contact = addBox(g, '#f1bf55', 0, contactY, sign * 4.95, .3, .035, .9); contact.rotation.x = sign * rampAngle;
+          for (let i = 0; i < 10; i++) {
+            const along = 1.9 + i * .3, z = sign * along, y = .64 + (3.5 - along) * Math.sin(rampAngle);
+            const slat = addBox(g, '#d4eee0', 0, y + .05, z, .29, .025, .035); slat.rotation.x = sign * rampAngle;
+          }
+          const supportTop = .64 + (3.5 - 2.4) * Math.sin(rampAngle) - .045;
+          addBox(g, charcoal, 0, supportTop / 2, sign * 2.4, .07, supportTop, .07);
         }
         for (const sign of [-1, 1]) addBox(g, charcoal, 0, .62, sign * 1.5, .5, 1.2, .05);
         break;
       }
       case 'seesaw': {
-        const plank = addBox(g, teal, 0, .56, 0, .3, .08, 3.7); plank.rotation.x = .08;
-        addBox(g, '#e9a749', 0, .3, 0, .14, .6, .18);
-        addBox(g, '#f1bf55', 0, .56, -1.45, .3, .035, .75); addBox(g, '#f1bf55', 0, .56, 1.45, .3, .035, .75);
+        const tilt = .08;
+        const plank = addBox(g, teal, 0, .6, 0, .3, .08, 3.7); plank.rotation.x = tilt;
+        // A central pivot at 60 cm supports the plank without poking through it.
+        addBox(g, '#e9a749', 0, .28, 0, .14, .56, .18);
+        addCylinder(g, '#34453b', 0, .6, 0, .07, .38, 20).rotation.z = Math.PI / 2;
+        for (const sign of [-1, 1]) {
+          const z = sign * 1.45, y = .6 - z * Math.sin(tilt);
+          const contact = addBox(g, '#f1bf55', 0, y, z, .3, .035, .75); contact.rotation.x = tilt;
+        }
         break;
       }
       case 'tunnel': addTunnel(g, obstacle); break;
@@ -204,27 +229,37 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
       for (let i = 0; i < ordered.length - 1; i++) {
         const a = ordered[i], b = ordered[i + 1], prev = ordered[i - 1] || a, next = ordered[i + 2] || b;
         const unitScale = s.unit === 'ft' ? .3048 : 1, L = s.length * unitScale, W = s.width * unitScale;
-        const p0 = new THREE.Vector3((a.x - .5) * L, .08, (a.y - .5) * W);
-        const p3 = new THREE.Vector3((b.x - .5) * L, .08, (b.y - .5) * W);
+        const ta = a.type === 'tunnel' ? tunnelTraversal(s, ordered, i, L, W) : null;
+        const tb = b.type === 'tunnel' ? tunnelTraversal(s, ordered, i + 1, L, W) : null;
+        const p0 = ta ? ta.exit.clone() : new THREE.Vector3((a.x - .5) * L, .08, (a.y - .5) * W);
+        const p3 = tb ? tb.entry.clone() : new THREE.Vector3((b.x - .5) * L, .08, (b.y - .5) * W);
         const pp = new THREE.Vector3((prev.x - .5) * L, .08, (prev.y - .5) * W);
         const pn = new THREE.Vector3((next.x - .5) * L, .08, (next.y - .5) * W);
         const delta = new THREE.Vector3().subVectors(p3, p0), len = Math.max(.01, delta.length());
         const normal = new THREE.Vector3(delta.z, 0, -delta.x).normalize();
         const offset = (s.routeBends?.[`${a.id}:${b.id}`] || 0) * Math.min(L, W);
-        const align = len * .12, ra = (Number(a.rotation) || 0) * Math.PI / 180, rb = (Number(b.rotation) || 0) * Math.PI / 180;
-        const c1 = p0.clone().add(new THREE.Vector3(p3.x - pp.x, 0, p3.z - pp.z).multiplyScalar(.18)).add(normal.clone().multiplyScalar(offset)).add(new THREE.Vector3(Math.cos(ra) * align, 0, Math.sin(ra) * align));
-        const c2 = p3.clone().sub(new THREE.Vector3(pn.x - p0.x, 0, pn.z - p0.z).multiplyScalar(.18)).add(normal.clone().multiplyScalar(offset)).sub(new THREE.Vector3(Math.cos(rb) * align, 0, Math.sin(rb) * align));
+        const align = len * .2, ra = (Number(a.rotation) || 0) * Math.PI / 180, rb = (Number(b.rotation) || 0) * Math.PI / 180;
+        const startTangent = ta && ta.exit.clone().sub(ta.points.at(-2)).normalize(), endTangent = tb && tb.points[1].clone().sub(tb.entry).normalize();
+        const c1 = p0.clone().add(startTangent ? startTangent.multiplyScalar(align) : new THREE.Vector3(p3.x - pp.x, 0, p3.z - pp.z).multiplyScalar(.18).add(new THREE.Vector3(Math.cos(ra) * align, 0, Math.sin(ra) * align))).add(normal.clone().multiplyScalar(offset));
+        const c2 = p3.clone().sub(endTangent ? endTangent.multiplyScalar(align) : new THREE.Vector3(pn.x - p0.x, 0, pn.z - p0.z).multiplyScalar(.18).add(new THREE.Vector3(Math.cos(rb) * align, 0, Math.sin(rb) * align))).add(normal.clone().multiplyScalar(offset));
         const curve = new THREE.CubicBezierCurve3(p0, c1, c2, p3);
         if (s.showRoute) {
           const line = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, .035, 6, false), mat(s.path || '#f07851', .48));
           line.userData.routeKey = `${a.id}:${b.id}`; line.userData.routeNormal = normal; routeGroup.add(line);
+          if (tb) {
+            const inside = new THREE.CatmullRomCurve3(tb.points);
+            const tunnelLine = new THREE.Mesh(new THREE.TubeGeometry(inside, 40, .035, 6, false), mat(s.path || '#f07851', .48));
+            tunnelLine.material.depthTest = false; tunnelLine.renderOrder = 5;
+            tunnelLine.userData.routeKey = `${a.id}:${b.id}`; tunnelLine.userData.routeNormal = normal; routeGroup.add(tunnelLine);
+          }
         }
         if (s.showDistances) {
+          const centerA = new THREE.Vector3((a.x - .5) * L, .12, (a.y - .5) * W), centerB = new THREE.Vector3((b.x - .5) * L, .12, (b.y - .5) * W);
           const meters = Math.hypot((b.x - a.x) * L, (b.y - a.y) * W), amount = s.unit === 'ft' ? meters / .3048 : meters;
-          const chord = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(p0.x, .12, p0.z), new THREE.Vector3(p3.x, .12, p3.z)]);
+          const chord = new THREE.BufferGeometry().setFromPoints([centerA, centerB]);
           routeGroup.add(new THREE.Line(chord, new THREE.LineDashedMaterial({ color: '#63d4bf', dashSize: .28, gapSize: .18, transparent: true, opacity: .88 })));
           routeGroup.children.at(-1).computeLineDistances();
-          const mid = new THREE.Vector3((p0.x + p3.x) / 2, .28, (p0.z + p3.z) / 2), label = createLabel(`${amount.toFixed(1)} ${s.unit}`, '#fff5c6', '#28433b');
+          const mid = new THREE.Vector3((centerA.x + centerB.x) / 2, .28, (centerA.z + centerB.z) / 2), label = createLabel(`${amount.toFixed(1)} ${s.unit}`, '#fff5c6', '#28433b');
           label.position.set(mid.x, .28, mid.z); label.scale.set(1.1, .28, 1); routeGroup.add(label);
         }
       }
@@ -286,7 +321,8 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
       action = { type: 'move', id, offset: obstacleGroup.children.find(g => g.userData.obstacleId === id).position.clone().sub(point), moved: false };
       canvas.setPointerCapture(e.pointerId); e.preventDefault();
     } else {
-      action = { type: 'orbit', x: e.clientX, y: e.clientY }; last = { x: e.clientX, y: e.clientY };
+      const navigate = e.shiftKey || e.button === 1 || e.button === 2;
+      action = { type: navigate ? 'pan' : 'orbit' }; last = { x: e.clientX, y: e.clientY };
       canvas.setPointerCapture(e.pointerId); e.preventDefault();
     }
   });
@@ -294,6 +330,13 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
     if (!action) return;
     if (action.type === 'orbit') {
       azimuth -= (e.clientX - last.x) * .006; elevation = Math.max(.18, Math.min(1.42, elevation + (e.clientY - last.y) * .005)); last = { x: e.clientX, y: e.clientY }; update(getState());
+    } else if (action.type === 'pan') {
+      const rect = canvas.getBoundingClientRect(), scale = distance / Math.max(1, rect.height);
+      const dx = e.clientX - last.x, dy = e.clientY - last.y;
+      const right = new THREE.Vector3(Math.cos(azimuth), 0, -Math.sin(azimuth));
+      const screenUp = new THREE.Vector3(-Math.sin(azimuth) * Math.sin(elevation), 0, -Math.cos(azimuth) * Math.sin(elevation));
+      target.addScaledVector(right, -dx * scale).addScaledVector(screenUp, dy * scale);
+      last = { x: e.clientX, y: e.clientY }; update(getState());
     } else if (action.type === 'move') {
       ray(e); const point = new THREE.Vector3(); if (!caster.ray.intersectPlane(ground, point)) return;
       const x = point.x + action.offset.x, z = point.z + action.offset.z, s = getState();
@@ -309,6 +352,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
   });
   const finish = () => { if (action?.type === 'move' && action.moved) onDone(); if (action?.type === 'bend') onDone(); action = null; last = null; };
   canvas.addEventListener('pointerup', finish); canvas.addEventListener('pointercancel', finish);
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('wheel', e => { distance = Math.max(10, Math.min(130, distance * (e.deltaY > 0 ? 1.08 : .92))); update(getState()); clearTimeout(wheelTimeout); wheelTimeout = setTimeout(onDone, 400); e.preventDefault(); }, { passive: false });
   const observer = new ResizeObserver(() => update(getState())); observer.observe(canvas.parentElement);
   return { update, renderer, dispose() { observer.disconnect(); clearGroup(obstacleGroup); clearGroup(routeGroup); clearGroup(floorGroup); renderer.dispose(); } };
