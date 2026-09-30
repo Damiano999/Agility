@@ -1,4 +1,4 @@
-# Torownik
+# Agility map
 
 Lekki, samodzielny edytor planów torów agility. Aplikacja działa w przeglądarce i nie wymaga instalacji zależności ani procesu build.
 
