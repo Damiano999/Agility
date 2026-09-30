@@ -4,7 +4,7 @@ Lekki, samodzielny edytor planów torów agility. Aplikacja działa w przegląda
 
 ## Uruchamianie
 
-Otwórz `index.html` lokalnie albo opublikuj repozytorium jako stronę statyczną, np. przez GitHub Pages.
+Opublikuj repozytorium jako stronę statyczną, np. przez GitHub Pages. Lokalny podgląd uruchom przez serwer statyczny — przeglądarki blokują moduły JavaScript otwierane bezpośrednio z `file://`.
 
 ## Struktura
 
