@@ -1,0 +1,314 @@
+import * as THREE from 'three';
+
+const obstacleColors = {
+  jump: '#f2aa42', spread: '#f2aa42', triple: '#f2aa42', wall: '#ed7863', longJump: '#ef9c4e',
+  tire: '#ef7868', aFrame: '#16a6a9', dogWalk: '#16a6a9', seesaw: '#16a6a9', tunnel: '#18aab9', chute: '#ed7863', weave: '#ef7868',
+};
+
+export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDone, onError }) {
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); onError('Utracono kontekst grafiki 3D. Przełącz na 2D i ponów próbę.'); });
+  canvas.addEventListener('webglcontextrestored', () => update(getState()));
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('#14201c');
+  scene.fog = new THREE.Fog('#14201c', 35, 110);
+  const camera = new THREE.PerspectiveCamera(38, 1, .1, 300);
+  const target = new THREE.Vector3(0, 0, 0);
+  let azimuth = .72, elevation = .78, distance = 52;
+  const hemi = new THREE.HemisphereLight('#f5ffe9', '#687568', 2.3); scene.add(hemi);
+  const sun = new THREE.DirectionalLight('#fff4d8', 3.2); sun.position.set(-16, 28, 18); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -40; sun.shadow.camera.right = 40; sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40; scene.add(sun);
+  const fill = new THREE.DirectionalLight('#8ce1dc', 1.0); fill.position.set(18, 12, -16); scene.add(fill);
+  const matCache = new Map();
+  const mat = (color, roughness = .72, metalness = 0) => {
+    const key = `${color}-${roughness}-${metalness}`;
+    if (!matCache.has(key)) matCache.set(key, new THREE.MeshStandardMaterial({ color, roughness, metalness }));
+    return matCache.get(key);
+  };
+  const floorGroup = new THREE.Group(), obstacleGroup = new THREE.Group(), routeGroup = new THREE.Group();
+  scene.add(floorGroup, routeGroup, obstacleGroup);
+
+  function addBox(group, color, x, y, z, w, h, d, options = {}) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, options.roughness ?? .72, options.metalness ?? 0));
+    mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh); return mesh;
+  }
+  function addCylinder(group, color, x, y, z, radius, height, segments = 16) {
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, segments), mat(color, .55));
+    mesh.position.set(x, y, z); mesh.castShadow = true; group.add(mesh); return mesh;
+  }
+  function addBar(group, color, z, height = .55, length = 1.2) {
+    addBox(group, '#26352f', -.56, height / 2, z, .055, height, .055);
+    addBox(group, '#26352f', .56, height / 2, z, .055, height, .055);
+    const bar = addCylinder(group, color, 0, height, z, .035, length, 20); bar.rotation.z = Math.PI / 2;
+    for (let i = -2; i <= 2; i++) addCylinder(group, i % 2 ? '#f8f2d8' : color, i * length / 5, height, z, .036, length / 5, 16).rotation.z = Math.PI / 2;
+  }
+  function addRamp(group, z, sign, width = .9, length = 2.7, height = 1.7, contact = true) {
+    const angle = Math.asin(Math.min(.98, height / length));
+    const centerZ = z + sign * length * Math.cos(angle) / 2;
+    const centerY = Math.max(.12, height - length * Math.sin(angle) / 2);
+    const plank = addBox(group, '#16a6a9', 0, centerY, centerZ, width, .09, length);
+    plank.rotation.x = sign * angle;
+    if (contact) {
+      const contactLength = Math.min(1.06, length * .36);
+      const endZ = centerZ + sign * (length / 2 - contactLength / 2) * Math.cos(angle);
+      const endY = centerY - (length / 2 - contactLength / 2) * Math.sin(angle);
+      const zone = addBox(group, '#f1bf55', 0, endY + .03, endZ, width * .98, .035, contactLength);
+      zone.rotation.x = sign * angle;
+    }
+    for (let i = -4; i <= 4; i++) {
+      const local = i * .27, rz = centerZ + local * Math.cos(angle), ry = centerY - sign * local * Math.sin(angle) + .065;
+      const slat = addBox(group, '#d4eee0', 0, ry, rz, width * .94, .025, .035); slat.rotation.x = sign * angle;
+    }
+  }
+  function makeTunnelCurve(length, bendDegrees) {
+    const angle = Math.max(0, Math.min(150, Number(bendDegrees) || 0)) * Math.PI / 180;
+    if (angle < .001) return new THREE.CatmullRomCurve3([new THREE.Vector3(0, .32, -length / 2), new THREE.Vector3(0, .32, 0), new THREE.Vector3(0, .32, length / 2)]);
+    const radius = length / angle, pts = [];
+    for (let i = 0; i <= 40; i++) {
+      const a = (i / 40 - .5) * angle;
+      pts.push(new THREE.Vector3(radius * (Math.cos(a) - Math.cos(angle / 2)), .32, radius * Math.sin(a)));
+    }
+    return new THREE.CatmullRomCurve3(pts);
+  }
+  function addTunnel(group, obstacle) {
+    const length = Math.max(3, Math.min(6, Number(obstacle.length) || 4.5));
+    const curve = makeTunnelCurve(length, obstacle.bend);
+    const shell = new THREE.Mesh(new THREE.TubeGeometry(curve, 72, .3, 16, false), mat('#1ba8b8', .46));
+    shell.castShadow = true; shell.receiveShadow = true; group.add(shell);
+    for (const t of [0, 1]) {
+      const point = curve.getPointAt(t), tangent = curve.getTangentAt(t);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(.3, .035, 10, 32), mat('#ec7762', .5));
+      rim.position.copy(point); rim.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent); rim.castShadow = true; group.add(rim);
+      const inner = new THREE.Mesh(new THREE.TorusGeometry(.23, .018, 8, 24), mat('#86dfd6', .45));
+      inner.position.copy(point); inner.quaternion.copy(rim.quaternion); group.add(inner);
+    }
+    for (let t = .12; t < .95; t += .16) {
+      const point = curve.getPointAt(t), tangent = curve.getTangentAt(t);
+      const hoop = new THREE.Mesh(new THREE.TorusGeometry(.3, .012, 6, 24), mat('#166879', .62));
+      hoop.position.copy(point); hoop.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent); group.add(hoop);
+    }
+  }
+  function makeObstacle(obstacle) {
+    const g = new THREE.Group(); g.userData.obstacleId = obstacle.id;
+    const orange = '#f1a943', teal = '#16a6a9', charcoal = '#273630';
+    switch (obstacle.type) {
+      case 'jump': addBar(g, orange, 0, .55); break;
+      case 'spread': addBar(g, orange, -.24, .5); addBar(g, '#48b9aa', .24, .72, 1.35); break;
+      case 'triple': [-.52, 0, .52].forEach((z, i) => addBar(g, i % 2 ? teal : orange, z, .42 + i * .16)); break;
+      case 'wall':
+        addBox(g, charcoal, 0, .31, 0, 1.18, .62, .25);
+        for (let y = .16; y < .62; y += .15) addBox(g, y > .42 ? orange : '#e9c18c', 0, y, .14, 1.1, .025, .025);
+        break;
+      case 'longJump':
+        for (let i = 0; i < 4; i++) { const z = -.56 + i * .36, h = .12 + i * .045; addBox(g, i % 2 ? '#f5d27a' : orange, 0, h / 2, z, 1.25, h, .28); }
+        for (const x of [-.72, .72]) for (const z of [-.72, .72]) addCylinder(g, '#34453b', x, .52, z, .025, 1.04, 8);
+        break;
+      case 'tire': {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(.28, .055, 12, 40), mat('#ef7868', .45)); ring.position.y = .8; ring.castShadow = true; g.add(ring);
+        for (const x of [-.4, .4]) { addBox(g, charcoal, x, .4, 0, .045, .8, .06); addBox(g, charcoal, x, .04, 0, .4, .08, .36); }
+        break;
+      }
+      case 'aFrame': addRamp(g, 0, -1); addRamp(g, 0, 1); break;
+      case 'dogWalk': {
+        addBox(g, teal, 0, 1.24, 0, .3, .1, 3.65);
+        for (const sign of [-1, 1]) {
+          const ramp = addBox(g, teal, 0, .64, sign * 3.5, .3, .09, 3.65); ramp.rotation.x = -sign * Math.asin(1.2 / 3.65);
+          addBox(g, '#f1bf55', 0, .19, sign * 4.95, .3, .035, .9);
+          for (let i = 0; i < 10; i++) { const z = sign * (1.9 + i * .3), y = .55 + (.62 * (1 - i / 10)); addBox(g, '#d4eee0', 0, y, z, .29, .025, .035); }
+          addBox(g, charcoal, 0, .55, sign * 2.4, .07, 1.1, .07);
+        }
+        for (const sign of [-1, 1]) addBox(g, charcoal, 0, .62, sign * 1.5, .5, 1.2, .05);
+        break;
+      }
+      case 'seesaw': {
+        const plank = addBox(g, teal, 0, .56, 0, .3, .08, 3.7); plank.rotation.x = .08;
+        addBox(g, '#e9a749', 0, .3, 0, .14, .6, .18);
+        addBox(g, '#f1bf55', 0, .56, -1.45, .3, .035, .75); addBox(g, '#f1bf55', 0, .56, 1.45, .3, .035, .75);
+        break;
+      }
+      case 'tunnel': addTunnel(g, obstacle); break;
+      case 'chute': {
+        addCylinder(g, teal, 0, .32, -.77, .32, .7, 28).rotation.x = Math.PI / 2;
+        addBox(g, '#ed7863', 0, .28, .62, .62, .5, 2.1);
+        for (let i = 0; i < 7; i++) addBox(g, '#d95e5b', 0, .28, -.2 + i * .25, .63, .51, .018);
+        break;
+      }
+      case 'weave':
+        for (let i = 0; i < 12; i++) {
+          const x = (i - 5.5) * .6;
+          addCylinder(g, i % 2 ? '#ef7868' : teal, x, .55, 0, .035, 1.1, 10);
+          addCylinder(g, charcoal, x, .025, 0, .11, .05, 12);
+        }
+        addBox(g, charcoal, 0, .025, 0, 6.9, .04, .07);
+        break;
+      default: addBox(g, obstacleColors[obstacle.type] || orange, 0, .4, 0, .8, .8, .8);
+    }
+    g.rotation.y = -(Number(obstacle.rotation) || 0) * Math.PI / 180;
+    const pos = createObstacleBadge(g, obstacle);
+    g.userData.badge = pos;
+    g.userData.badgeSignature = `${obstacle.n}|${obstacle.label || ''}`;
+    g.userData.geometrySignature = `${obstacle.type}|${obstacle.length || ''}|${obstacle.bend || ''}`;
+    g.traverse(obj => { if (obj.isMesh) { obj.userData.obstacleId = obstacle.id; obj.castShadow = true; } });
+    return g;
+  }
+  function createObstacleBadge(group, obstacle) {
+    const pos = createLabel(`${obstacle.n}${obstacle.label ? ` · ${obstacle.label}` : ''}`, '#fff8e8', '#234238');
+    pos.position.set(0, obstacle.type === 'aFrame' ? 2.15 : obstacle.type === 'dogWalk' ? 1.75 : 1.3, 0);
+    pos.scale.set(1.45, .34, 1); group.add(pos); return pos;
+  }
+  function createLabel(text, foreground = '#f3f7ee', background = '#1b2b25') {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+    const x = c.getContext('2d'); x.fillStyle = background; x.beginPath(); x.roundRect(8, 15, 496, 98, 28); x.fill();
+    x.fillStyle = foreground; x.font = 'bold 54px system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 256, 64, 470);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false })); sprite.renderOrder = 3; return sprite;
+  }
+  function clearGroup(group) {
+    for (const child of [...group.children]) {
+      group.remove(child);
+      child.traverse?.(obj => { obj.geometry?.dispose?.(); if (obj.material?.map) obj.material.map.dispose(); if (obj.material && !Array.isArray(obj.material) && !matCacheHas(obj.material)) obj.material.dispose(); });
+    }
+  }
+  function matCacheHas(material) { return [...matCache.values()].includes(material); }
+  function buildFloor(s) {
+    clearGroup(floorGroup);
+    const unitScale = s.unit === 'ft' ? .3048 : 1, L = (Number(s.length) || 40) * unitScale, W = (Number(s.width) || 24) * unitScale;
+    addBox(floorGroup, '#24342c', 0, -.18, 0, L + 1.1, .36, W + 1.1);
+    addBox(floorGroup, '#b5c39d', 0, .005, 0, L, .04, W);
+    const outline = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(L, .045, W)), new THREE.LineBasicMaterial({ color: '#55694b' }));
+    outline.position.y = .04; floorGroup.add(outline);
+    if (s.grid) {
+      const points = [], step = Math.max(.5, (Number(s.gridSize) || 2) * (s.unit === 'ft' ? .3048 : 1));
+      for (let x = -L / 2; x <= L / 2 + .001; x += step) { points.push(new THREE.Vector3(x, .032, -W / 2), new THREE.Vector3(x, .032, W / 2)); }
+      for (let z = -W / 2; z <= W / 2 + .001; z += step) { points.push(new THREE.Vector3(-L / 2, .032, z), new THREE.Vector3(L / 2, .032, z)); }
+      const geom = new THREE.BufferGeometry().setFromPoints(points);
+      floorGroup.add(new THREE.LineSegments(geom, new THREE.LineBasicMaterial({ color: '#697960', transparent: true, opacity: .28 })));
+    }
+    floorGroup.userData.signature = `${L}|${W}|${s.grid}|${s.gridSize}|${s.unit}`;
+    const radius = Math.hypot(L, W) * 1.4;
+    target.set(0, .3, 0); distance = Math.max(25, radius);
+    sun.shadow.camera.left = -L; sun.shadow.camera.right = L; sun.shadow.camera.top = W; sun.shadow.camera.bottom = -W; sun.shadow.camera.updateProjectionMatrix();
+    camera.far = radius * 5; camera.updateProjectionMatrix();
+  }
+  function buildRoute(s) {
+    clearGroup(routeGroup);
+    const ordered = [...s.obstacles].sort((a, b) => a.n - b.n);
+    if ((s.showRoute || s.showDistances) && ordered.length > 1) {
+      for (let i = 0; i < ordered.length - 1; i++) {
+        const a = ordered[i], b = ordered[i + 1], prev = ordered[i - 1] || a, next = ordered[i + 2] || b;
+        const unitScale = s.unit === 'ft' ? .3048 : 1, L = s.length * unitScale, W = s.width * unitScale;
+        const p0 = new THREE.Vector3((a.x - .5) * L, .08, (a.y - .5) * W);
+        const p3 = new THREE.Vector3((b.x - .5) * L, .08, (b.y - .5) * W);
+        const pp = new THREE.Vector3((prev.x - .5) * L, .08, (prev.y - .5) * W);
+        const pn = new THREE.Vector3((next.x - .5) * L, .08, (next.y - .5) * W);
+        const delta = new THREE.Vector3().subVectors(p3, p0), len = Math.max(.01, delta.length());
+        const normal = new THREE.Vector3(delta.z, 0, -delta.x).normalize();
+        const offset = (s.routeBends?.[`${a.id}:${b.id}`] || 0) * Math.min(L, W);
+        const align = len * .12, ra = (Number(a.rotation) || 0) * Math.PI / 180, rb = (Number(b.rotation) || 0) * Math.PI / 180;
+        const c1 = p0.clone().add(new THREE.Vector3(p3.x - pp.x, 0, p3.z - pp.z).multiplyScalar(.18)).add(normal.clone().multiplyScalar(offset)).add(new THREE.Vector3(Math.cos(ra) * align, 0, Math.sin(ra) * align));
+        const c2 = p3.clone().sub(new THREE.Vector3(pn.x - p0.x, 0, pn.z - p0.z).multiplyScalar(.18)).add(normal.clone().multiplyScalar(offset)).sub(new THREE.Vector3(Math.cos(rb) * align, 0, Math.sin(rb) * align));
+        const curve = new THREE.CubicBezierCurve3(p0, c1, c2, p3);
+        if (s.showRoute) {
+          const line = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, .035, 6, false), mat(s.path || '#f07851', .48));
+          line.userData.routeKey = `${a.id}:${b.id}`; line.userData.routeNormal = normal; routeGroup.add(line);
+        }
+        if (s.showDistances) {
+          const meters = Math.hypot((b.x - a.x) * L, (b.y - a.y) * W), amount = s.unit === 'ft' ? meters / .3048 : meters;
+          const chord = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(p0.x, .12, p0.z), new THREE.Vector3(p3.x, .12, p3.z)]);
+          routeGroup.add(new THREE.Line(chord, new THREE.LineDashedMaterial({ color: '#63d4bf', dashSize: .28, gapSize: .18, transparent: true, opacity: .88 })));
+          routeGroup.children.at(-1).computeLineDistances();
+          const mid = new THREE.Vector3((p0.x + p3.x) / 2, .28, (p0.z + p3.z) / 2), label = createLabel(`${amount.toFixed(1)} ${s.unit}`, '#fff5c6', '#28433b');
+          label.position.set(mid.x, .28, mid.z); label.scale.set(1.1, .28, 1); routeGroup.add(label);
+        }
+      }
+    }
+  }
+  function update(s) {
+    const unitScale = s.unit === 'ft' ? .3048 : 1;
+    const signature = `${(Number(s.length) || 40) * unitScale}|${(Number(s.width) || 24) * unitScale}|${s.grid}|${s.gridSize}|${s.unit}`;
+    if (floorGroup.userData.signature !== signature) buildFloor(s);
+    const L = (Number(s.length) || 40) * unitScale, W = (Number(s.width) || 24) * unitScale;
+    const liveIds = new Set();
+    for (const obstacle of s.obstacles) {
+      liveIds.add(obstacle.id);
+      let g = obstacleGroup.children.find(child => child.userData.obstacleId === obstacle.id);
+      const geometrySignature = `${obstacle.type}|${obstacle.length || ''}|${obstacle.bend || ''}`;
+      if (!g || g.userData.geometrySignature !== geometrySignature) {
+        if (g) { obstacleGroup.remove(g); disposeObject(g); }
+        g = makeObstacle(obstacle); obstacleGroup.add(g);
+      } else if (g.userData.badgeSignature !== `${obstacle.n}|${obstacle.label || ''}`) {
+        g.remove(g.userData.badge); g.userData.badge?.material?.map?.dispose(); g.userData.badge?.material?.dispose();
+        g.userData.badge = createObstacleBadge(g, obstacle); g.userData.badgeSignature = `${obstacle.n}|${obstacle.label || ''}`;
+      }
+      g.position.set((obstacle.x - .5) * L, .045, (obstacle.y - .5) * W);
+      g.rotation.y = -(Number(obstacle.rotation) || 0) * Math.PI / 180;
+    }
+    for (const child of [...obstacleGroup.children]) if (!liveIds.has(child.userData.obstacleId)) { obstacleGroup.remove(child); disposeObject(child); }
+    buildRoute(s);
+    camera.position.set(target.x + Math.sin(azimuth) * Math.cos(elevation) * distance, target.y + Math.sin(elevation) * distance, target.z + Math.cos(azimuth) * Math.cos(elevation) * distance);
+    camera.lookAt(target);
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width && rect.height) { renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; camera.updateProjectionMatrix(); }
+    renderer.render(scene, camera);
+  }
+  function disposeObject(object) {
+    object.traverse(obj => { obj.geometry?.dispose?.(); if (obj.material?.map) obj.material.map.dispose(); if (obj.material && !Array.isArray(obj.material) && !matCacheHas(obj.material)) obj.material.dispose(); });
+  }
+  function ray(e) {
+    const r = canvas.getBoundingClientRect(); pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    caster.setFromCamera(pointer, camera);
+  }
+  const caster = new THREE.Raycaster(), pointer = new THREE.Vector2(), ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  let action = null, last = null, wheelTimeout;
+  canvas.addEventListener('pointerdown', e => {
+    ray(e);
+    if (getState().tool === 'route') {
+      caster.params.Line = { threshold: .18 };
+      const hits = caster.intersectObjects(routeGroup.children, true).filter(h => h.object.userData.routeKey);
+      if (hits.length) {
+        const obj = hits[0].object, point = hits[0].point, normal = obj.userData.routeNormal;
+        action = { type: 'bend', key: obj.userData.routeKey, normal, start: point, initial: getState().routeBends?.[obj.userData.routeKey] || 0 };
+        canvas.setPointerCapture(e.pointerId); e.preventDefault(); return;
+      }
+    }
+    const hits = caster.intersectObjects(obstacleGroup.children, true).filter(h => h.object.userData.obstacleId);
+    if (hits.length) {
+      const hit = hits[0], id = hit.object.userData.obstacleId;
+      onSelect(id);
+      const point = new THREE.Vector3(); caster.ray.intersectPlane(ground, point);
+      action = { type: 'move', id, offset: obstacleGroup.children.find(g => g.userData.obstacleId === id).position.clone().sub(point), moved: false };
+      canvas.setPointerCapture(e.pointerId); e.preventDefault();
+    } else {
+      action = { type: 'orbit', x: e.clientX, y: e.clientY }; last = { x: e.clientX, y: e.clientY };
+      canvas.setPointerCapture(e.pointerId); e.preventDefault();
+    }
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!action) return;
+    if (action.type === 'orbit') {
+      azimuth -= (e.clientX - last.x) * .006; elevation = Math.max(.18, Math.min(1.42, elevation + (e.clientY - last.y) * .005)); last = { x: e.clientX, y: e.clientY }; update(getState());
+    } else if (action.type === 'move') {
+      ray(e); const point = new THREE.Vector3(); if (!caster.ray.intersectPlane(ground, point)) return;
+      const x = point.x + action.offset.x, z = point.z + action.offset.z, s = getState();
+      const g = obstacleGroup.children.find(v => v.userData.obstacleId === action.id); if (g) g.position.set(x, .045, z);
+      const unitScale = s.unit === 'ft' ? .3048 : 1;
+      action.moved = true; onMove(action.id, Math.max(0, Math.min(1, x / (s.length * unitScale) + .5)), Math.max(0, Math.min(1, z / (s.width * unitScale) + .5)));
+    } else if (action.type === 'bend') {
+      ray(e); const point = new THREE.Vector3(); if (!caster.ray.intersectPlane(ground, point)) return;
+      const delta = point.sub(action.start).dot(action.normal), s = getState();
+      const unitScale = s.unit === 'ft' ? .3048 : 1;
+      onBend(action.key, Math.max(-.28, Math.min(.28, action.initial + delta / Math.min(s.length * unitScale, s.width * unitScale))));
+    }
+  });
+  const finish = () => { if (action?.type === 'move' && action.moved) onDone(); if (action?.type === 'bend') onDone(); action = null; last = null; };
+  canvas.addEventListener('pointerup', finish); canvas.addEventListener('pointercancel', finish);
+  canvas.addEventListener('wheel', e => { distance = Math.max(10, Math.min(130, distance * (e.deltaY > 0 ? 1.08 : .92))); update(getState()); clearTimeout(wheelTimeout); wheelTimeout = setTimeout(onDone, 400); e.preventDefault(); }, { passive: false });
+  const observer = new ResizeObserver(() => update(getState())); observer.observe(canvas.parentElement);
+  return { update, renderer, dispose() { observer.disconnect(); clearGroup(obstacleGroup); clearGroup(routeGroup); clearGroup(floorGroup); renderer.dispose(); } };
+}
+
