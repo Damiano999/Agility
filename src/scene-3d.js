@@ -43,10 +43,21 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
     mesh.position.set(x, y, z); mesh.castShadow = true; group.add(mesh); return mesh;
   }
   function addBar(group, color, z, height = .55, length = 1.2) {
-    addBox(group, '#26352f', -.56, height / 2, z, .055, height, .055);
-    addBox(group, '#26352f', .56, height / 2, z, .055, height, .055);
-    const bar = addCylinder(group, color, 0, height, z, .035, length, 20); bar.rotation.z = Math.PI / 2;
-    for (let i = -2; i <= 2; i++) addCylinder(group, i % 2 ? '#f8f2d8' : color, i * length / 5, height, z, .036, length / 5, 16).rotation.z = Math.PI / 2;
+    const postX = length / 2 - .08;
+    for (const side of [-1, 1]) {
+      const x = side * postX;
+      addBox(group, '#26352f', x, .055, z, .34, .11, .3);
+      addBox(group, '#e8e1cd', x, .49, z, .075, .88, .085);
+      addBox(group, color, x, .76, z + .006, .105, .27, .1);
+      for (let mark = 0; mark < 3; mark++) addBox(group, '#f8f2d8', x, .68 + mark * .075, z + .062, .108, .025, .012);
+      const brace = addBox(group, '#45584b', side * (postX - .105), .205, z, .32, .055, .065);
+      brace.rotation.z = side > 0 ? .78 : Math.PI - .78;
+      addBox(group, '#e9c763', x, height - .035, z, .16, .07, .14);
+    }
+    for (let i = -2; i <= 2; i++) {
+      const segmentLength = length / 5;
+      addCylinder(group, i % 2 ? '#f8f2d8' : color, i * segmentLength, height, z, .045, segmentLength + .008, 20).rotation.z = Math.PI / 2;
+    }
   }
   function addRamp(group, z, sign, width = .9, length = 2.7, height = 1.7, contact = true) {
     const angle = Math.asin(Math.min(.98, height / length));
