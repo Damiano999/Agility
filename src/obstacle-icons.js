@@ -34,7 +34,7 @@ export function obstacleFootprint(obstacle) {
   const bend = Math.max(0, Math.min(150, Number(obstacle.bend) || 0)) * Math.PI / 180;
   const footprints = {
     jump: [1.3, .6], spread: [1.3, .5], triple: [1.3, 1.5], wall: [1.2, .4],
-    longJump: [1.5, 1.5], tire: [1.1, .4], aFrame: [.9, 4.2], dogWalk: [.3, 10.6],
+    longJump: [1.5, 1.5], tire: [1.1, .4], aFrame: [.9, 5.4], dogWalk: [.3, 10.6],
     seesaw: [.3, 3.7], weave: [6.6, .6], chute: [.65, 2.8],
   };
   if (obstacle.type === 'tunnel') {
