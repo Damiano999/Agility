@@ -11,7 +11,10 @@ Opublikuj repozytorium jako stronę statyczną, np. przez GitHub Pages. Lokalny 
 - `index.html` — punkty montażowe interfejsu i podłączenie zasobów.
 - `src/styles.css` — układ, responsywność i styl aplikacji.
 - `src/app.js` — stan edytora, narzędzia, zapis lokalny i eksport.
-- `src/obstacle-icons.js` — rysowanie ikon przeszkód na planszy.
+- `src/obstacle-icons.js` — ładowanie i rysowanie przezroczystych ikon PNG.
+- `assets/obstacles/` — ilustracje przeszkód.
 
-Zmiany w projekcie są zapisywane w pamięci lokalnej przeglądarki. Projekt można też eksportować i importować jako JSON, a planszę pobrać jako PNG.
+Edytor oferuje rzut 2D z góry i widok izometryczny 3D. Przeszkody można obracać; pozycje, numery i orientacje wpływają na automatyczną, wygładzoną trasę. Narzędzie trasy pozwala przeciągać uchwyty i ustawiać łuki. Długość tunelu można regulować od 3 do 6 m zgodnie z wytycznymi FCI ([FCI Agility Obstacle Guidelines](https://www.fci.be/medias/FCI-AGI-DIR-OBS-17043.pdf)).
+
+Zmiany w projekcie są zapisywane w pamięci lokalnej przeglądarki. Projekt można eksportować i importować jako JSON, a planszę pobrać jako PNG.
 
