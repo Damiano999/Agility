@@ -17,4 +17,5 @@
 .tutorial-prompt .tutorial-actions .btn:not(.primary){background:#34483e;border-color:#718879;color:#f2f7f1}.tutorial-prompt .tutorial-actions .btn:not(.primary):hover{background:#42594c;border-color:#9aafa0}
 
 .test-version-bar{height:24px;min-height:24px;display:grid;place-items:center;background:#30281d;border-bottom:1px solid #594630;color:#ffd28a;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.terms-dialog{width:min(620px,calc(100vw - 28px));max-height:min(88vh,760px);overflow:auto;border:1px solid #657667;border-radius:18px;padding:24px;background:#17221e;color:#e8eee8;box-shadow:0 24px 80px #0009}.terms-dialog::backdrop{background:#050a08c9;backdrop-filter:blur(3px)}.terms-dialog h2{font:800 21px Manrope,sans-serif;margin:9px 0 14px}.terms-body{max-height:58vh;overflow:auto;color:#bdc9c1;font-size:12px;line-height:1.6}.terms-body p{margin:0 0 10px}.terms-body ol{padding-left:19px;margin:0}.terms-body li{padding:0 0 9px 3px}.terms-body b{color:#eff5ed}.terms-dialog>.btn{margin-top:16px;min-height:42px}
 
