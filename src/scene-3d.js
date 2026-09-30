@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { obstacleFootprint } from './obstacle-icons.js';
 
 const obstacleColors = {
-  jump: '#f2aa42', wall: '#ed7863', longJump: '#ef9c4e',
+  jump: '#f2aa42', spread: '#f2aa42', wall: '#ed7863', longJump: '#ef9c4e',
   tire: '#ef7868', aFrame: '#16a6a9', dogWalk: '#16a6a9', seesaw: '#16a6a9', tunnel: '#18aab9', chute: '#ed7863', weave: '#ef7868',
 };
 
