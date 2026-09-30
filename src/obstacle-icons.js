@@ -1,14 +1,14 @@
 const iconFiles = {
-  jump: 'jump.png', spread: 'spread.png', triple: 'triple.png', wall: 'wall.png',
+  jump: 'jump.png', triple: 'triple.png', wall: 'wall.png',
   longJump: 'long-jump.png', tire: 'tire.png', aFrame: 'a-frame.png',
   dogWalk: 'dog-walk.png', seesaw: 'seesaw.png', tunnel: 'tunnel.png',
-  chute: 'chute.png', weave: 'weave.png',
+  weave: 'weave.png',
 };
 
 const names = {
-  jump: 'Skok pojedynczy', spread: 'Skok podwójny', triple: 'Skok potrójny',
+  jump: 'Skok pojedynczy', triple: 'Skok potrójny',
   wall: 'Ściana / panel', longJump: 'Skok w dal', tire: 'Koło', aFrame: 'Palizada A',
-  dogWalk: 'Kładka', seesaw: 'Huśtawka', tunnel: 'Tunel', chute: 'Tunel miękki', weave: 'Slalom',
+  dogWalk: 'Kładka', seesaw: 'Huśtawka', tunnel: 'Tunel', weave: 'Slalom',
 };
 
 const icons = Object.fromEntries(Object.entries(iconFiles).map(([type, file]) => {
@@ -33,9 +33,9 @@ export function obstacleFootprint(obstacle) {
   const length = Number(obstacle.length) || 4.5;
   const bend = Math.max(0, Math.min(150, Number(obstacle.bend) || 0)) * Math.PI / 180;
   const footprints = {
-    jump: [1.3, .6], spread: [1.3, .5], triple: [1.3, 1.5], wall: [1.2, .4],
+    jump: [1.3, .6], triple: [1.3, 1.5], wall: [1.2, .4],
     longJump: [1.5, 1.5], tire: [1.1, .4], aFrame: [.9, 5.4], dogWalk: [.3, 10.6],
-    seesaw: [.3, 3.7], weave: [6.6, .6], chute: [.65, 2.8],
+    seesaw: [.3, 3.7], weave: [6.6, .6],
   };
   if (obstacle.type === 'tunnel') {
     const angle = bend;
