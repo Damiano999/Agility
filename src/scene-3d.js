@@ -117,7 +117,9 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
       case 'dogWalk': {
         addBox(g, teal, 0, 1.24, 0, .3, .1, 3.65);
         for (const sign of [-1, 1]) {
-          const ramp = addBox(g, teal, 0, .64, sign * 3.5, .3, .09, 3.65); ramp.rotation.x = -sign * Math.asin(1.2 / 3.65);
+          // The inner end of each ramp must meet the 1.2 m high deck;
+          // the outer end slopes down to ground level.
+          const ramp = addBox(g, teal, 0, .64, sign * 3.5, .3, .09, 3.65); ramp.rotation.x = sign * Math.asin(1.2 / 3.65);
           addBox(g, '#f1bf55', 0, .19, sign * 4.95, .3, .035, .9);
           for (let i = 0; i < 10; i++) { const z = sign * (1.9 + i * .3), y = .55 + (.62 * (1 - i / 10)); addBox(g, '#d4eee0', 0, y, z, .29, .025, .035); }
           addBox(g, charcoal, 0, .55, sign * 2.4, .07, 1.1, .07);
