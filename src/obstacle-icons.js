@@ -1,12 +1,12 @@
 const iconFiles = {
-  jump: 'jump.png', triple: 'triple.png', wall: 'wall.png',
+  jump: 'jump.png', wall: 'wall.png',
   longJump: 'long-jump.png', tire: 'tire.png', aFrame: 'a-frame.png',
   dogWalk: 'dog-walk.png', seesaw: 'seesaw.png', tunnel: 'tunnel.png',
   weave: 'weave.png',
 };
 
 const names = {
-  jump: 'Skok pojedynczy', triple: 'Skok potrójny',
+  jump: 'Skok pojedynczy',
   wall: 'Ściana / panel', longJump: 'Skok w dal', tire: 'Koło', aFrame: 'Palizada A',
   dogWalk: 'Kładka', seesaw: 'Huśtawka', tunnel: 'Tunel', weave: 'Slalom',
 };
@@ -33,7 +33,7 @@ export function obstacleFootprint(obstacle) {
   const length = Number(obstacle.length) || 4.5;
   const bend = Math.max(0, Math.min(150, Number(obstacle.bend) || 0)) * Math.PI / 180;
   const footprints = {
-    jump: [1.3, .6], triple: [1.3, 1.5], wall: [1.2, .4],
+    jump: [1.3, .6], wall: [1.2, .4],
     longJump: [1.5, 1.5], tire: [1.1, .4], aFrame: [.9, 5.4], dogWalk: [.3, 10.6],
     seesaw: [.3, 3.7], weave: [6.6, .6],
   };
@@ -79,12 +79,11 @@ function paintTopDown(ctx, obstacle, width, depth, base) {
   const bar = (z, color = yellow, thickness = .045) => { ctx.fillStyle = dark; ctx.fillRect(-width / 2, z - .12, width, .24); ctx.fillStyle = color; ctx.fillRect(-width / 2 + .025, z - thickness / 2, width - .05, thickness); };
   const plank = (z, length, color = teal, w = width) => { ctx.fillStyle = dark; ctx.fillRect(-w / 2, z - length / 2, w, length); ctx.fillStyle = color; ctx.fillRect(-w / 2 + .025, z - length / 2 + .025, w - .05, length - .05); };
   switch (obstacle.type) {
-    case 'jump': case 'spread':
+    case 'jump':
       [-width / 2 + .08, width / 2 - .08].forEach(x => { ctx.fillStyle = dark; ctx.fillRect(x - .035, -depth / 2, .07, depth); });
       if (obstacle.type === 'jump') bar(0);
       else { bar(-depth * .34, yellow); bar(depth * .34, coral); }
       break;
-    case 'triple': [-depth * .38, 0, depth * .38].forEach((z, i) => bar(z, i % 2 ? coral : yellow)); break;
     case 'wall': ctx.fillStyle = dark; ctx.fillRect(-width / 2, -depth / 2, width, depth); ctx.fillStyle = '#df8b70'; ctx.fillRect(-width / 2 + .05, -depth / 2 + .04, width - .1, depth - .08); for (let z = -depth / 2 + .13; z < depth / 2; z += .16) { ctx.strokeStyle = '#fff0d8'; ctx.lineWidth = .025; ctx.beginPath(); ctx.moveTo(-width / 2 + .05, z); ctx.lineTo(width / 2 - .05, z); ctx.stroke(); } break;
     case 'longJump': for (let i = 0; i < 4; i++) plank(-depth / 2 + (i + .5) * depth / 4, depth / 5, i % 2 ? yellow : coral, width * (.72 + i * .06)); break;
     case 'tire': ctx.beginPath(); ctx.arc(0, 0, .31, 0, Math.PI * 2); ctx.fillStyle = '#f3e9cd'; ctx.fill(); ctx.strokeStyle = coral; ctx.lineWidth = .12; ctx.stroke(); ctx.fillStyle = dark; ctx.fillRect(-width / 2, -depth / 2, width, .07); ctx.fillRect(-width / 2, depth / 2 - .07, width, .07); break;
