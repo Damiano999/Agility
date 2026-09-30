@@ -47,32 +47,44 @@ function pointerMove(e){const p=coords(e);$('#coord').textContent=`${(p.x*state.
 function pointerUp(){if(drag?.moved||dragCurve?.moved)markDirty();drag=null;dragCurve=null}
 function shuffle(list){for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]]}return list}
 function randomCourse(mode){
- saveHistory();const competition=mode==='competition',gap=5.5;
- const randTunnel=(length)=>({type:'tunnel',length,bend:[0,15,30,45,60][Math.floor(Math.random()*5)]});
- let rows;
+ saveHistory();const competition=mode==='competition',rand=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.floor(Math.random()*a.length)];
+ const randTunnel=short=>({type:'tunnel',length:short?3.5:rand(4.5,6),bend:pick([0,0,15,30,45,60,75])});
+ let pool,rowSizes;
  if(competition){
-  const extra=4.5+Math.random()*1.5;
-  rows=[[{type:'jump'},{type:'aFrame'},{type:'jump'},{type:'jump'}],[{type:'jump'},{type:'dogWalk'},{type:'jump'},{type:'jump'}],[{type:'jump'},{type:'weave'},{type:'seesaw'},{type:'jump'}],[randTunnel(3.5),{type:'jump'},{type:'tire'},{type:'jump'}],[randTunnel(extra),{type:'wall'},{type:'longJump'},{type:'jump'}]];
-  if(Math.random()<.65)rows[0][2]={type:'spread'};
-  for(const row of rows)shuffle(row.slice(1,-1)).forEach((o,i)=>row[i+1]=o);
+  pool=[...Array(11)].map(()=>({type:'jump'}));pool.push({type:'aFrame'},{type:'dogWalk'},{type:'seesaw'},{type:'weave'},randTunnel(true),randTunnel(false),{type:'tire'},{type:'wall'},{type:'longJump'});
+  if(Math.random()<.72)pool[ Math.floor(Math.random()*11) ]={type:'spread'};
+  rowSizes=[4,4,4,4,4];
  }else{
-  rows=[[{type:'jump'},randTunnel(3.5),{type:'jump'},{type:'jump'},{type:'jump'}],[{type:'jump'},randTunnel(5.5),{type:'jump'},{type:'jump'},{type:'jump'}],[{type:'jump'},randTunnel(4.5+Math.random()*1.5),{type:'jump'},{type:'jump'}],[{type:'jump'},randTunnel(4.5+Math.random()*1.5),{type:'jump'},{type:'jump'}]];
-  for(const row of rows)shuffle(row.slice(1,-1)).forEach((o,i)=>row[i+1]=o);
+  pool=[...Array(14)].map(()=>({type:'jump'}));pool.push(randTunnel(true),randTunnel(false),randTunnel(false),randTunnel(false));rowSizes=[5,5,4,4];
  }
+ // Keep the opening and finish as single jumps; randomize every obstacle between them.
+ const middle=shuffle([...pool]);for(let i=0;i<2;i++){const jump=middle.findIndex(o=>o.type==='jump');middle.splice(jump,1)}pool=[{type:'jump'},...middle,{type:'jump'}];
+ let rows=[],offset=0;for(const size of rowSizes){rows.push(pool.slice(offset,offset+size));offset+=size}rows.forEach((row,r)=>{const from=r===0?1:0,to=r===rows.length-1?row.length-1:row.length,middle=shuffle(row.slice(from,to));for(let i=from;i<to;i++)row[i]=middle[i-from]});
  const span=o=>o.type==='weave'?7.2:o.type==='tunnel'?Math.hypot(...(()=>{const p=tunnelPath(o.length,o.bend,1);return[p.at(-1).x-p[0].x,p.at(-1).y-p[0].y]})()):obstacleFootprint(o).depth;
  state.length=40;state.width=24;state.unit='m';state.gridSize=2;
- const dirs=rows.map((_,i)=>i%2? -1:1),spans=rows.map(row=>row.map(span));let cursor=0,lo=0,hi=0;
- for(let r=0;r<rows.length;r++){for(let i=0;i<rows[r].length;i++){cursor+=dirs[r]*spans[r][i];if(i<rows[r].length-1)cursor+=dirs[r]*gap}lo=Math.min(lo,cursor);hi=Math.max(hi,cursor);}
- if(hi-lo>40)throw Error('Nie udało się zmieścić toru na planszy.');let offset=(40-(hi-lo))/2-lo;cursor=offset;const course=[];
- const laneGap=competition?5.2:6.5,laneStart=(24-laneGap*(rows.length-1))/2;
- for(let r=0;r<rows.length;r++){
-  const row=rows[r],dir=dirs[r],y=laneStart+r*laneGap;
-  for(let i=0;i<row.length;i++){
-   const item=row[i],length=spans[r][i],rotation=item.type==='weave'?(dir>0?0:180):(dir>0?-90:90),centerX=cursor+dir*length/2;
-   course.push({...item,x:centerX/40,y:y/24,rotation,n:course.length+1,id:id(),label:''});
-   cursor+=dir*length;if(i<row.length-1)cursor+=dir*gap;
+ const spans=rows.map(row=>row.map(span)),laneGaps=Array.from({length:rows.length-1},()=>competition?rand(5.15,5.65):rand(5.4,6.4));
+ const totalLane=laneGaps.reduce((a,b)=>a+b,0),laneStart=(24-totalLane)/2,lanes=[laneStart];laneGaps.forEach(g=>lanes.push(lanes.at(-1)+g));
+ let course=[],placed=false;
+ // Retry random approaches when a row would leave the field; every inter-obstacle dog-path gap stays in range.
+ for(let attempt=0;attempt<100&&!placed;attempt++){
+  const candidate=[],dirs=rows.map((_,i)=>i%2?-1:1);let entryX=rand(3.2,7.2),entryY=lanes[0],valid=true;
+  for(let r=0;r<rows.length&&valid;r++){
+   const row=rows[r],dir=dirs[r],ys=row.map((_,i)=>lanes[r]+(i===0||i===row.length-1?0:rand(-.7,.7)));
+   // Later rows start near the previous exit, with a randomized diagonal approach.
+   if(r){const dy=lanes[r]-lanes[r-1],target=rand(Math.max(5.25,dy),Math.min(7.2,dy+1.25)),dx=Math.sqrt(Math.max(0,target*target-dy*dy))*pick([-1,1]);entryX+=dx;entryY=lanes[r]}
+   let portalX=entryX;
+   for(let i=0;i<row.length;i++){
+    const item=row[i],length=spans[r][i],centerX=portalX+dir*length/2,centerY=ys[i];
+    if(centerX-length/2<.65||centerX+length/2>39.35||centerY<1.1||centerY>22.9){valid=false;break}
+    const rotation=item.type==='weave'?(dir>0?0:180):(dir>0?-90:90);
+    candidate.push({...item,x:centerX/40,y:centerY/24,rotation,n:candidate.length+1,id:id(),label:''});
+    if(i<row.length-1){const dy=ys[i+1]-ys[i],target=rand(5.15,6.85),dx=Math.sqrt(Math.max(.1,target*target-dy*dy));portalX=centerX+dir*(length/2+dx)}
+    else {entryX=centerX+dir*length/2;entryY=centerY}
+   }
   }
+  if(valid&&candidate.length===pool.length){course=candidate;placed=true}
  }
+ if(!placed)throw Error('Nie udało się ułożyć losowego toru na planszy. Spróbuj ponownie.');
  state.obstacles=course;state.route=[];state.routeBends={};state.selected=null;state.tool='select';state.view='2d';state.showRoute=true;state.showNumbers=true;state.showDistances=true;$('#leftPanel').classList.remove('mobile-open');$('#showTools').classList.remove('active');
  state.title=competition?'Tor losowy — standard FCI':'Tor treningowy — skoki i tunele';sync();draw();markDirty();
  toast(competition?'Wylosowano tor 20 przeszkód. Zweryfikuj go przed treningiem.':'Wylosowano treningowy tor skokowo-tunelowy.');
