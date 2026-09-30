@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { obstacleFootprint } from './obstacle-icons.js';
 
 const obstacleColors = {
-  jump: '#f2aa42', spread: '#f2aa42', triple: '#f2aa42', wall: '#ed7863', longJump: '#ef9c4e',
+  jump: '#f2aa42', wall: '#ed7863', longJump: '#ef9c4e',
   tire: '#ef7868', aFrame: '#16a6a9', dogWalk: '#16a6a9', seesaw: '#16a6a9', tunnel: '#18aab9', chute: '#ed7863', weave: '#ef7868',
 };
 
@@ -93,7 +93,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
               : obstacle.type === 'wall' ? .65 : obstacle.type === 'longJump' ? .2
                 : obstacle.type === 'tire' ? .8 : obstacle.type === 'tunnel' ? .32
                   : obstacle.type === 'chute' ? .28 : obstacle.type === 'spread' ? .65
-                    : obstacle.type === 'triple' ? .7 : .55;
+                    : .55;
         return new THREE.Vector3(0, y, z);
       });
     }
@@ -131,7 +131,6 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
     switch (obstacle.type) {
       case 'jump': addBar(g, orange, 0, .55); break;
       case 'spread': addBar(g, orange, -.24, .5); addBar(g, '#48b9aa', .24, .72, 1.35); break;
-      case 'triple': [-.52, 0, .52].forEach((z, i) => addBar(g, i % 2 ? teal : orange, z, .42 + i * .16)); break;
       case 'wall':
         addBox(g, charcoal, 0, .31, 0, 1.18, .62, .25);
         for (let y = .16; y < .62; y += .15) addBox(g, y > .42 ? orange : '#e9c18c', 0, y, .14, 1.1, .025, .025);
@@ -308,6 +307,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
         g.remove(g.userData.badge); g.userData.badge?.material?.map?.dispose(); g.userData.badge?.material?.dispose();
         g.userData.badge = createObstacleBadge(g, obstacle); g.userData.badgeSignature = `${obstacle.n}|${obstacle.label || ''}`;
       }
+      g.userData.badge.visible = !!s.showNumbers;
       g.position.set((obstacle.x - .5) * L, .045, (obstacle.y - .5) * W);
       g.rotation.y = -(Number(obstacle.rotation) || 0) * Math.PI / 180;
     }
