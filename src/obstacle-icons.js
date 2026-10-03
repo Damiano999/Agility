@@ -38,7 +38,7 @@ export function obstacleFootprint(obstacle) {
   const footprints = {
     jump: [1.3, .6], spread: [1.3, .5], wall: [1.2, .4],
     longJump: [1.5, 1.5], tire: [1.1, .4],
-    seesaw: [.3, 3.7], weave: [6.6, .6],
+    seesaw: [.3, 3.7],
   };
   if (obstacle.type === 'aFrame') {
     const rampLength = 2.7, run = Math.sqrt(Math.max(.01, rampLength ** 2 - Math.min(height, rampLength - .01) ** 2));
@@ -53,6 +53,10 @@ export function obstacleFootprint(obstacle) {
     if (angle < .001) return { width: .6, depth: length };
     const radius = length / angle;
     return { width: .6 + 2 * radius * (1 - Math.cos(angle / 2)), depth: 2 * radius * Math.sin(angle / 2) + .6 };
+  }
+  if (obstacle.type === 'weave') {
+    const count = Number(obstacle.poleCount) === 6 ? 6 : 12;
+    return { width: (count - 1) * .6, depth: .6 };
   }
   const [width, depth] = footprints[obstacle.type] || [.8, .8];
   return { width, depth };
@@ -101,7 +105,7 @@ function paintTopDown(ctx, obstacle, width, depth, base) {
     case 'aFrame': plank(0, depth, teal); for (const z of [-depth / 2 + .53, depth / 2 - .53]) plank(z, 1.06, yellow, width * .96); ctx.strokeStyle = '#e5f1d9'; ctx.lineWidth = .025; for (let z = -depth / 2 + .72; z < depth / 2 - .6; z += .25) { ctx.beginPath(); ctx.moveTo(-width / 2, z); ctx.lineTo(width / 2, z); ctx.stroke(); } break;
     case 'dogWalk': plank(0, depth, teal); for (const z of [-depth / 2 + .45, depth / 2 - .45]) plank(z, .9, yellow, width * .96); ctx.strokeStyle = '#e5f1d9'; ctx.lineWidth = .018; for (let z = -depth / 2 + 1.1; z < depth / 2 - .7; z += .28) { ctx.beginPath(); ctx.moveTo(-width / 2, z); ctx.lineTo(width / 2, z); ctx.stroke(); } break;
     case 'seesaw': plank(0, depth, teal); plank(-depth / 2 + .38, .76, yellow, width * .98); plank(depth / 2 - .38, .76, yellow, width * .98); ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(0, 0, .12, 0, Math.PI * 2); ctx.fill(); break;
-    case 'weave': for (let i = 0; i < 12; i++) { const x = (i - 5.5) * .6; ctx.beginPath(); ctx.arc(x, 0, .08, 0, Math.PI * 2); ctx.fillStyle = i % 2 ? coral : teal; ctx.fill(); ctx.lineWidth = .025; ctx.strokeStyle = dark; ctx.stroke(); } ctx.strokeStyle = dark; ctx.lineWidth = .035; ctx.beginPath(); ctx.moveTo(-3.3, .13); ctx.lineTo(3.3, .13); ctx.stroke(); break;
+    case 'weave': { const count = Number(obstacle.poleCount) === 6 ? 6 : 12, half = (count - 1) * .3; for (let i = 0; i < count; i++) { const x = (i - (count - 1) / 2) * .6; ctx.beginPath(); ctx.arc(x, 0, .08, 0, Math.PI * 2); ctx.fillStyle = i % 2 ? coral : teal; ctx.fill(); ctx.lineWidth = .025; ctx.strokeStyle = dark; ctx.stroke(); } ctx.strokeStyle = dark; ctx.lineWidth = .035; ctx.beginPath(); ctx.moveTo(-half, .13); ctx.lineTo(half, .13); ctx.stroke(); break; }
     case 'chute': ctx.fillStyle = teal; ctx.beginPath(); ctx.arc(0, -depth / 2 + .35, width / 2, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = coral; ctx.beginPath(); ctx.moveTo(-width / 2, -depth / 2 + .65); ctx.lineTo(width / 2, -depth / 2 + .65); ctx.lineTo(width / 2 * .7, depth / 2); ctx.lineTo(-width / 2 * .7, depth / 2); ctx.closePath(); ctx.fill(); for (let z = -depth / 2 + .8; z < depth / 2; z += .27) { ctx.strokeStyle = '#ffd4be'; ctx.lineWidth = .025; ctx.beginPath(); ctx.moveTo(-width / 2 * .8, z); ctx.lineTo(width / 2 * .8, z); ctx.stroke(); } break;
     default: ctx.fillStyle = base || teal; ctx.fillRect(-width / 2, -depth / 2, width, depth);
   }
@@ -140,3 +144,4 @@ export function drawObstacle(ctx, canvas, obstacle, selected, state) {
   ctx.fillStyle = '#26352f'; ctx.font = '600 9px "DM Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.fillText(label.length > 19 ? `${label.slice(0, 18)}…` : label, x, y + labelOffset, Math.max(88, width * pxX + 18));
 }
+
