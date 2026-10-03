@@ -35,6 +35,8 @@ flowchart LR
 
 - Edycja planszy w widoku 2D i nawigacja po scenie 3D.
 - Przesuwanie i obracanie przeszkód oraz automatyczne aktualizowanie trasy zgodnie z ich kolejnością. Przebieg uwzględnia osie przeszkód, tyczki slalomu i krzywiznę tunelu.
+- Regulacja wysokości palisady A i kładki z automatyczną zmianą nachylenia ramp. Zaznaczoną przeszkodę można dodać do toru ponownie, z powtórzonym numerem i dodatkowym odcinkiem trasy.
+- Siatka z opisami współrzędnych w metrach oraz bieżącą skalą planszy w pikselach na metr.
 - Losowanie toru z wyborem liczby przeszkód (do 20) i rodzaju układu.
 - Regulowana długość i kształt tunelu otwartego, pomiar odległości między kolejnymi przeszkodami oraz ustawienia planszy.
 - Zapisywanie projektu w pamięci przeglądarki, import i eksport JSON oraz pobieranie planszy jako PNG.
@@ -42,3 +44,30 @@ flowchart LR
 - Układ responsywny dla telefonów i komputerów.
 
 Wymiary przeszkód odzwierciedlają wartości regulaminowe tam, gdzie są określone. Na przykład kładka ma około 10,5 m, slalom ma 12 tyczek w odstępach 60 cm, a otwarty tunel ma średnicę około 60 cm i długość 3–6 m. Szczegóły mogą zależeć od klasy zawodów i aktualnego regulaminu; losowy układ warto zweryfikować przed treningiem lub zawodami. [Regulamin FCI](https://www.fci.be/medias/FCI-AGI-DIR-OBS-17043.pdf).
+
+## Uruchamianie lokalne
+
+To statyczna aplikacja bez procesu build. Uruchom lokalny serwer HTTP w katalogu projektu, np.:
+
+```bash
+python -m http.server 8000
+```
+
+Następnie otwórz `http://localhost:8000`. Moduły JavaScript nie działają poprawnie otwierane bezpośrednio jako plik `file://`. Widok 3D korzysta z Three.js ładowanego z jsDelivr i wymaga połączenia z internetem oraz obsługi WebGL.
+
+## Struktura projektu
+
+```text
+.
+├── index.html              # Struktura strony i okna dialogowe
+├── README.md               # Opis aplikacji i instrukcja uruchamiania
+├── assets/
+│   └── obstacles/          # Przezroczyste grafiki przeszkód PNG
+└── src/
+    ├── app.js              # Stan edytora, interakcje, zapis i eksport
+    ├── obstacle-icons.js   # Ikony 2D, obrysy i geometria planszy
+    ├── scene-3d.js         # Modele przeszkód i interaktywny widok 3D
+    └── styles.css          # Układ, responsywność i style
+```
+
+Projekty i ustawienia są przechowywane lokalnie w przeglądarce. Aplikacja nie wymaga konta ani własnego serwera API.
