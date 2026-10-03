@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { obstacleFootprint, obstacleEntrySide } from './obstacle-icons.js?v=agility-alternate-track-color-20261003';
+import { obstacleFootprint, obstacleEntrySide } from './obstacle-icons.js?v=agility-full-alternate-routes-20261003';
 
 const obstacleColors = {
   jump: '#f2aa42', spread: '#f2aa42', wall: '#ed7863', longJump: '#ef9c4e',
@@ -212,7 +212,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   function obstacleBadgeSignature(obstacle){const route=Array.isArray(getState().route)?getState().route:[],numbers=route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id).map(item=>Number.isInteger(item.visit?.n)?item.visit.n:obstacle.n);return `${obstacle.n}|${obstacle.label||''}|${numbers.join(',')}`}
   function createObstacleBadge(group, obstacle) {
     const badges=new THREE.Group(),s=getState(),route=Array.isArray(s.route)?s.route:[],visits=route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id),items=visits.length?visits:[{visit:null,index:null}],height=Number(obstacle.height)||(obstacle.type==='dogWalk'?1.2:1.7),depth=obstacleFootprint(obstacle).depth;
-    for(let i=0;i<items.length;i++){const {visit,index}=items[i],number=Number.isInteger(visit?.n)?visit.n:obstacle.n,badge=createLabel(`${number}${obstacle.label?` · ${obstacle.label}`:''}`, '#fff8e8', '#234238');badge.userData.obstacleId=obstacle.id;badge.userData.visitIndex=index;badge.userData.numberBadge=true;badge.position.x=(i-(items.length-1)/2)*.52;badge.position.z=obstacleEntrySide(obstacle,s,index)*(depth/2+.62);badge.scale.set(1.45,.34,1);badges.add(badge)}
+    for(let i=0;i<items.length;i++){const {visit,index}=items[i],number=Number.isInteger(visit?.n)?visit.n:obstacle.n,badge=createLabel(`${number}${obstacle.label?` · ${obstacle.label}`:''}`, '#fff8e8', '#234238');badge.userData.obstacleId=obstacle.id;badge.userData.visitIndex=index;badge.userData.numberBadge=true;badge.position.x=(i-(items.length-1)/2)*.52;badge.position.z=obstacleEntrySide(obstacle,s,index)*(depth/2+1.05);badge.scale.set(1.45,.34,1);badges.add(badge)}
     badges.position.y=obstacle.type==='aFrame'?height+.42:obstacle.type==='dogWalk'?height+.42:1.3;group.add(badges);return badges;
   }
   function createLabel(text, foreground = '#f3f7ee', background = '#1b2b25') {
@@ -256,7 +256,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     clearGroup(routeGroup);
     const byId=new Map(s.obstacles.map(o=>[o.id,o])),visits=Array.isArray(s.route)?s.route.map((visit,index)=>({visit,index,key:typeof visit==='string'?visit:visit?.obstacleId})).filter(item=>byId.has(item.key)):[];
     const ordered = visits.length?visits.map(({visit,index,key})=>({...byId.get(key),n:Number.isInteger(visit?.n)?visit.n:byId.get(key).n,_visitIndex:index,_visitKey:`${key}@${index}`})):[...s.obstacles].sort((a, b) => a.n - b.n);
-    const groups=[];for(let i=0;i<ordered.length;i++){const o=ordered[i],last=groups.at(-1);if(last&&Number(last[0].o.n)===Number(o.n)&&last.some(item=>item.o.id!==o.id))last.push({o,index:i});else groups.push([{o,index:i}])}for(const group of groups)group.forEach((item,variantIndex)=>item.variantIndex=variantIndex);const links=[];for(let i=0;i<groups.length-1;i++)for(const aa of groups[i])for(const bb of groups[i+1])links.push({ai:aa.index,bi:bb.index,a:aa.o,b:bb.o,alternate:aa.variantIndex>0||bb.variantIndex>0,prev:groups[i-1]?.[0].o||aa.o,next:groups[i+2]?.[0].o||bb.o});
+    const groups=[];for(let i=0;i<ordered.length;i++){const o=ordered[i],last=groups.at(-1);if(last&&Number(last[0].o.n)===Number(o.n)&&last.some(item=>item.o.id!==o.id))last.push({o,index:i});else groups.push([{o,index:i}])}groups.forEach(group=>group.forEach((item,variantIndex)=>item.variantIndex=variantIndex));const choices=groups.map(()=>0),paths=[{choices:[...choices],alternate:false}];groups.forEach((group,groupIndex)=>group.slice(1).forEach(item=>{const branch=[...choices];branch[groupIndex]=item.variantIndex;paths.push({choices:branch,alternate:true})}));const links=[];for(let g=0;g<groups.length-1;g++)for(const path of paths){const aa=groups[g][path.choices[g]],bb=groups[g+1][path.choices[g+1]];links.push({ai:aa.index,bi:bb.index,a:aa.o,b:bb.o,alternate:path.alternate,prev:groups[g-1]?.[path.choices[g-1]]?.o||aa.o,next:groups[g+2]?.[path.choices[g+2]]?.o||bb.o})}
     if ((s.showRoute || s.showDistances) && ordered.length > 1) {
       for (const {ai,bi,a,b,prev,next,alternate} of links) {
         const unitScale = s.unit === 'ft' ? .3048 : 1, L = s.length * unitScale, W = s.width * unitScale;
