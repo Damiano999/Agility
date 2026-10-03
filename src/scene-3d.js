@@ -93,7 +93,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
     const { depth } = obstacleFootprint(obstacle);
     let localPoints;
     if (obstacle.type === 'tunnel') localPoints = makeTunnelCurve(Math.max(3, Math.min(6, Number(obstacle.length) || 4.5)), obstacle.bend).getPoints(40);
-    else if (obstacle.type === 'weave') localPoints = [new THREE.Vector3(-3.6, .55, 0), ...Array.from({ length: 12 }, (_, i) => new THREE.Vector3((i - 5.5) * .6, .55, i % 2 ? .27 : -.27)), new THREE.Vector3(3.6, .55, 0)];
+    else if (obstacle.type === 'weave') { const count = Number(obstacle.poleCount) === 6 ? 6 : 12; localPoints = [new THREE.Vector3(-((count - 1) * .3 + .3), .55, 0), ...Array.from({ length: count }, (_, i) => new THREE.Vector3((i - (count - 1) / 2) * .6, .55, i % 2 ? .27 : -.27)), new THREE.Vector3((count - 1) * .3 + .3, .55, 0)]; }
     else {
       const steps = ['aFrame', 'dogWalk', 'seesaw'].includes(obstacle.type) ? 32 : 1;
       localPoints = Array.from({ length: steps + 1 }, (_, i) => {
@@ -101,7 +101,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
         let y;
         if(obstacle.type==='aFrame'){const height=Math.max(1.2,Math.min(2,Number(obstacle.height)||1.7));y=.08+height*Math.max(0,1-abs/(depth/2))}
         else if(obstacle.type==='dogWalk'){const height=Math.max(.8,Math.min(1.3,Number(obstacle.height)||1.2)),rampLength=3.65,run=Math.sqrt(rampLength**2-height**2),deckHalf=1.825;y=.08+(abs<=deckHalf?height:height*Math.max(0,1-(abs-deckHalf)/run))}
-        else y=obstacle.type==='seesaw'?.64-z*Math.sin(.08):obstacle.type==='wall'?.65:obstacle.type==='longJump'?.2:obstacle.type==='tire'?.8:obstacle.type==='tunnel'?.32:obstacle.type==='chute'?.28:obstacle.type==='spread'?.65:.55;
+        else y=obstacle.type==='seesaw'?.64-z*Math.sin(.08):obstacle.type==='wall'?.65:obstacle.type==='longJump'?.2:obstacle.type==='tire'?(Number(obstacle.height)||.8):obstacle.type==='tunnel'?.32:obstacle.type==='chute'?.28:obstacle.type==='spread'?.65:.55;
         return new THREE.Vector3(0, y, z);
       });
     }
@@ -148,8 +148,9 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
         for (const x of [-.72, .72]) for (const z of [-.72, .72]) addCylinder(g, '#34453b', x, .52, z, .025, 1.04, 8);
         break;
       case 'tire': {
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(.28, .055, 12, 40), mat('#ef7868', .45)); ring.position.y = .8; ring.castShadow = true; g.add(ring);
-        for (const x of [-.4, .4]) { addBox(g, charcoal, x, .4, 0, .045, .8, .06); addBox(g, charcoal, x, .04, 0, .4, .08, .36); }
+        const height = Math.max(.4, Math.min(1.2, Number(obstacle.height) || .8));
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(.28, .055, 12, 40), mat('#ef7868', .45)); ring.position.y = height; ring.castShadow = true; g.add(ring);
+        for (const x of [-.4, .4]) { addBox(g, charcoal, x, height / 2, 0, .045, height, .06); addBox(g, charcoal, x, .04, 0, .4, .08, .36); }
         break;
       }
       case 'aFrame': { const height = Math.max(1.2, Math.min(2, Number(obstacle.height) || 1.7)); addRamp(g, 0, -1, .9, 2.7, height); addRamp(g, 0, 1, .9, 2.7, height); break; }
@@ -189,12 +190,13 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
         break;
       }
       case 'weave':
-        for (let i = 0; i < 12; i++) {
-          const x = (i - 5.5) * .6;
+        { const count = Number(obstacle.poleCount) === 6 ? 6 : 12;
+        for (let i = 0; i < count; i++) {
+          const x = (i - (count - 1) / 2) * .6;
           addCylinder(g, i % 2 ? '#ef7868' : teal, x, .55, 0, .035, 1.1, 10);
           addCylinder(g, charcoal, x, .025, 0, .11, .05, 12);
         }
-        addBox(g, charcoal, 0, .025, 0, 6.9, .04, .07);
+        addBox(g, charcoal, 0, .025, 0, (count - 1) * .6, .04, .07); }
         break;
       default: addBox(g, obstacleColors[obstacle.type] || orange, 0, .4, 0, .8, .8, .8);
     }
@@ -202,7 +204,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
     const pos = createObstacleBadge(g, obstacle);
     g.userData.badge = pos;
     g.userData.badgeSignature = obstacleBadgeSignature(obstacle);
-    g.userData.geometrySignature = `${obstacle.type}|${obstacle.length || ''}|${obstacle.bend || ''}|${obstacle.height || ''}`;
+    g.userData.geometrySignature = `${obstacle.type}|${obstacle.length || ''}|${obstacle.bend || ''}|${obstacle.height || ''}|${obstacle.poleCount || ''}`;
     g.traverse(obj => { if (obj.isMesh) { obj.userData.obstacleId = obstacle.id; obj.castShadow = true; } });
     return g;
   }
@@ -311,7 +313,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
     for (const obstacle of s.obstacles) {
       liveIds.add(obstacle.id);
       let g = obstacleGroup.children.find(child => child.userData.obstacleId === obstacle.id);
-      const geometrySignature = `${obstacle.type}|${obstacle.length || ''}|${obstacle.bend || ''}|${obstacle.height || ''}`;
+      const geometrySignature = `${obstacle.type}|${obstacle.length || ''}|${obstacle.bend || ''}|${obstacle.height || ''}|${obstacle.poleCount || ''}`;
       if (!g || g.userData.geometrySignature !== geometrySignature) {
         if (g) { obstacleGroup.remove(g); disposeObject(g); }
         g = makeObstacle(obstacle); obstacleGroup.add(g);
@@ -395,3 +397,4 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
   const observer = new ResizeObserver(() => update(getState())); observer.observe(canvas.parentElement);
   return { update, renderer, dispose() { observer.disconnect(); clearGroup(obstacleGroup); clearGroup(routeGroup); clearGroup(floorGroup); renderer.dispose(); } };
 }
+
