@@ -96,16 +96,16 @@ function randomCourse(mode,count){
  let course=null;
  // Build a free-form path from random start points and turn sequences. Reject edge exits and equipment collisions.
  for(let attempt=0;attempt<2400&&!course;attempt++){
-  const gaps=Array.from({length:n-1},()=>rand(5.2,competition?6.9:7.6)),bearings=[rand(-Math.PI,Math.PI)];
+  const spreadFactor=n<=6?1.32:n<=10?1.16:1,gaps=Array.from({length:n-1},()=>rand(5.2,competition?6.9:7.6)*spreadFactor),bearings=[rand(-Math.PI,Math.PI)];
   const turns=[-145,-120,-95,-70,-45,-25,25,45,70,95,120,145];
   for(let i=1;i<n-1;i++)bearings.push(bearings[i-1]+pick(turns)*Math.PI/180);
   // Smooth obstacle axes between the approach and departure directions.
   const axes=pool.map((_,i)=>{if(i===0)return bearings[0];if(i===n-1)return bearings.at(-1);const a=bearings[i-1],b=bearings[i],x=Math.cos(a)+Math.cos(b),y=Math.sin(a)+Math.sin(b);return Math.hypot(x,y)<.15?b:Math.atan2(y,x)});
-  const spans=pool.map(span),entry={x:rand(2.3,37.7),y:rand(2.3,21.7)},candidate=[],boxes=[];let portal=entry,valid=true;
+  const spans=pool.map(span),marginX=n<=6?1.3:n<=10?1.8:2.3,marginY=n<=6?1.3:n<=10?1.8:2.3,entry={x:rand(marginX,40-marginX),y:rand(marginY,24-marginY)},candidate=[],boxes=[];let portal=entry,valid=true;
   for(let i=0;i<n;i++){
    const item=pool[i],axis=axes[i],center={x:portal.x+Math.cos(axis)*spans[i]/2,y:portal.y+Math.sin(axis)*spans[i]/2};
    const rotation=(axis*180/Math.PI-(item.type==='weave'?0:90)),box=rotatedObstacleBox(item,center.x,center.y,rotation);
-   if(box.some(p=>p.x<.55||p.x>39.45||p.y<.55||p.y>23.45)){valid=false;break}
+   const edgeMargin=n<=6?.35:n<=10?.45:.55;if(box.some(p=>p.x<edgeMargin||p.x>40-edgeMargin||p.y<edgeMargin||p.y>24-edgeMargin)){valid=false;break}
    if(boxes.some((other,j)=>boxesOverlap(box,other,.18)&&!(pool[i].type===pool[j].type&&(pool[i].type!=='tunnel'||(Math.abs((Number(pool[i].bend)||0)-(Number(pool[j].bend)||0))<1&&Math.abs((Number(pool[i].length)||0)-(Number(pool[j].length)||0))<.01))))){valid=false;break}
    boxes.push(box);candidate.push({...item,x:center.x/40,y:center.y/24,rotation,n:i+1,id:id(),label:''});
    portal={x:center.x+Math.cos(axis)*spans[i]/2,y:center.y+Math.sin(axis)*spans[i]/2};
