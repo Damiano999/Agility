@@ -96,9 +96,22 @@ function paintTopDown(ctx, obstacle, width, depth, base) {
   switch (obstacle.type) {
     case 'jump':
       [-width / 2 + .08, width / 2 - .08].forEach(x => { ctx.fillStyle = dark; ctx.fillRect(x - .035, -depth / 2, .07, depth); });
-      if (obstacle.type === 'jump') bar(0);
-      else { bar(-depth * .34, yellow); bar(depth * .34, coral); }
+      bar(0);
       break;
+    case 'spread': {
+      // Top-down wings on both sides, with two separate take-off bars.
+      for (const side of [-1, 1]) {
+        const x = side * (width / 2 - .075);
+        ctx.fillStyle = dark; ctx.fillRect(x - .065, -depth / 2, .13, depth);
+        ctx.fillStyle = teal; ctx.fillRect(x - .04, -depth / 2 + .025, .08, depth - .05);
+        ctx.strokeStyle = '#a9dfca'; ctx.lineWidth = .035;
+        ctx.beginPath(); ctx.moveTo(x, -depth / 2 + .06); ctx.lineTo(x - side * .17, -.025); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, depth / 2 - .06); ctx.lineTo(x - side * .17, .025); ctx.stroke();
+      }
+      bar(-depth * .32, yellow, .055);
+      bar(depth * .32, coral, .055);
+      break;
+    }
     case 'wall': ctx.fillStyle = dark; ctx.fillRect(-width / 2, -depth / 2, width, depth); ctx.fillStyle = '#df8b70'; ctx.fillRect(-width / 2 + .05, -depth / 2 + .04, width - .1, depth - .08); for (let z = -depth / 2 + .13; z < depth / 2; z += .16) { ctx.strokeStyle = '#fff0d8'; ctx.lineWidth = .025; ctx.beginPath(); ctx.moveTo(-width / 2 + .05, z); ctx.lineTo(width / 2 - .05, z); ctx.stroke(); } break;
     case 'longJump': for (let i = 0; i < 4; i++) plank(-depth / 2 + (i + .5) * depth / 4, depth / 5, i % 2 ? yellow : coral, width * (.72 + i * .06)); break;
     case 'tire': ctx.beginPath(); ctx.arc(0, 0, .31, 0, Math.PI * 2); ctx.fillStyle = '#f3e9cd'; ctx.fill(); ctx.strokeStyle = coral; ctx.lineWidth = .12; ctx.stroke(); ctx.fillStyle = dark; ctx.fillRect(-width / 2, -depth / 2, width, .07); ctx.fillRect(-width / 2, depth / 2 - .07, width, .07); break;
