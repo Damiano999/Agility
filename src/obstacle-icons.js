@@ -155,6 +155,6 @@ export function drawObstacle(ctx, canvas, obstacle, selected, state) {
     for(let i=0;i<badges;i++){const bx=badgeX+(i-(badges-1)/2)*23;ctx.beginPath();ctx.arc(bx,badgeY,12,0,Math.PI*2);ctx.fill();if(badges>1)ctx.stroke();ctx.fillStyle='#fff';ctx.fillText(obstacle.n,bx,badgeY);ctx.fillStyle='#284638'}
   }
   ctx.fillStyle = '#26352f'; ctx.font = '600 9px "DM Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  ctx.fillText(label.length > 19 ? `${label.slice(0, 18)}…` : label, x, y + labelOffset, Math.max(88, width * pxX + 18));
+  ctx.fillText(label.length > 19 ? `${label.slice(0, 18)}…` : label, x - Math.sin(angle) * labelOffset, y + Math.cos(angle) * labelOffset, Math.max(88, width * pxX + 18));
 }
 
