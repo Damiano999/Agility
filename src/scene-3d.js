@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { obstacleFootprint, obstacleEntrySide } from './obstacle-icons.js?v=agility-generator-approach-numbers-20261003';
+import { obstacleFootprint, obstacleEntrySide } from './obstacle-icons.js?v=agility-number-beside-entry-20261003';
 
 const obstacleColors = {
   jump: '#f2aa42', spread: '#f2aa42', wall: '#ed7863', longJump: '#ef9c4e',
@@ -213,7 +213,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   function createObstacleBadge(group, obstacle) {
     const badges=new THREE.Group(),count=obstacleVisitCount(obstacle),height=Number(obstacle.height)||(obstacle.type==='dogWalk'?1.2:1.7),entrySide=obstacleEntrySide(obstacle,getState()),depth=obstacleFootprint(obstacle).depth;
     for(let i=0;i<count;i++){const badge=createLabel(`${obstacle.n}${obstacle.label?` · ${obstacle.label}`:''}`, '#fff8e8', '#234238');badge.userData.obstacleId=obstacle.id;badge.userData.numberBadge=true;badge.position.x=(i-(count-1)/2)*.52;badge.scale.set(1.45,.34,1);badges.add(badge)}
-    badges.position.y=obstacle.type==='aFrame'?height+.42:obstacle.type==='dogWalk'?height+.42:1.3;badges.position.z=entrySide*(depth/2+.38);group.add(badges);return badges;
+    badges.position.y=obstacle.type==='aFrame'?height+.42:obstacle.type==='dogWalk'?height+.42:1.3;badges.position.z=entrySide*(depth/2+.62);group.add(badges);return badges;
   }
   function createLabel(text, foreground = '#f3f7ee', background = '#1b2b25') {
     const c = document.createElement('canvas'); c.width = 512; c.height = 128;
