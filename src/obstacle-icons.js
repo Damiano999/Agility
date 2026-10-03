@@ -111,6 +111,19 @@ function paintTopDown(ctx, obstacle, width, depth, base) {
   }
 }
 
+export function obstacleEntrySide(obstacle, state) {
+  const byId=new Map(state.obstacles.map(item=>[item.id,item]));
+  const route=Array.isArray(state.route)?state.route.map(visit=>typeof visit==='string'?visit:visit?.obstacleId).filter(key=>byId.has(key)):[];
+  const nodes=route.length?route.map(key=>byId.get(key)):[...state.obstacles].sort((a,b)=>Number(a.n)-Number(b.n));
+  const index=nodes.findIndex(item=>item.id===obstacle.id),before=nodes[index-1],after=nodes[index+1];
+  const angle=(Number(obstacle.rotation)||0)*Math.PI/180,{depth}=obstacleFootprint(obstacle),scale=state.unit==='ft'?.3048:1;
+  const endpoint=sign=>({x:obstacle.x+sign*(-depth/2*Math.sin(angle))/(state.length*scale),y:obstacle.y+sign*(depth/2*Math.cos(angle))/(state.width*scale)});
+  const distance=(point,other)=>Math.hypot((point.x-other.x)*state.length*scale,(point.y-other.y)*state.width*scale);
+  const front=endpoint(-1),back=endpoint(1);
+  if(before)return distance(front,before)<=distance(back,before)?-1:1;
+  if(after)return distance(front,after)>=distance(back,after)?-1:1;
+  return -1;
+}
 export function drawObstacle(ctx, canvas, obstacle, selected, state) {
   const x = obstacle.x * canvas.width, y = obstacle.y * canvas.height;
   const toMeters = value => (state.unit === 'ft' ? .3048 : 1) * value;
@@ -137,7 +150,7 @@ export function drawObstacle(ctx, canvas, obstacle, selected, state) {
   const labelOffset = Math.max(26, depth * pxY / 2 + 12);
   if (state.showNumbers) {
     const visits=Array.isArray(state.route)?state.route.filter(visit=>(typeof visit==='string'?visit:visit?.obstacleId)===obstacle.id).length:0;
-    const badges=Math.max(1,visits),badgeX=x+width*pxX/2, badgeY=y-depth*pxY/2;
+    const badges=Math.max(1,visits),entrySide=obstacleEntrySide(obstacle,state),badgeX=x+entrySide*(-depth/2*Math.sin(angle))*pxX,badgeY=y+entrySide*(depth/2*Math.cos(angle))*pxY;
     ctx.fillStyle='#284638';ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.font='700 11px "DM Sans", sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
     for(let i=0;i<badges;i++){const bx=badgeX+(i-(badges-1)/2)*23;ctx.beginPath();ctx.arc(bx,badgeY,12,0,Math.PI*2);ctx.fill();if(badges>1)ctx.stroke();ctx.fillStyle='#fff';ctx.fillText(obstacle.n,bx,badgeY);ctx.fillStyle='#284638'}
   }
