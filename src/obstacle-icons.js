@@ -111,11 +111,11 @@ function paintTopDown(ctx, obstacle, width, depth, base) {
   }
 }
 
-export function obstacleEntrySide(obstacle, state) {
+export function obstacleEntrySide(obstacle, state, visitIndex=null) {
   const byId=new Map(state.obstacles.map(item=>[item.id,item]));
   const route=Array.isArray(state.route)?state.route.map(visit=>typeof visit==='string'?visit:visit?.obstacleId).filter(key=>byId.has(key)):[];
   const nodes=route.length?route.map(key=>byId.get(key)):[...state.obstacles].sort((a,b)=>Number(a.n)-Number(b.n));
-  const index=nodes.findIndex(item=>item.id===obstacle.id),before=nodes[index-1],after=nodes[index+1];
+  const index=visitIndex==null?nodes.findIndex(item=>item.id===obstacle.id):visitIndex,before=nodes[index-1],after=nodes[index+1];
   const angle=(Number(obstacle.rotation)||0)*Math.PI/180,{depth}=obstacleFootprint(obstacle),scale=state.unit==='ft'?.3048:1;
   const endpoint=sign=>({x:obstacle.x+sign*(-depth/2*Math.sin(angle))/(state.length*scale),y:obstacle.y+sign*(depth/2*Math.cos(angle))/(state.width*scale)});
   const distance=(point,other)=>Math.hypot((point.x-other.x)*state.length*scale,(point.y-other.y)*state.width*scale);
@@ -149,10 +149,10 @@ export function drawObstacle(ctx, canvas, obstacle, selected, state) {
 
   const labelOffset = Math.max(26, depth * pxY / 2 + 12);
   if (state.showNumbers) {
-    const visits=Array.isArray(state.route)?state.route.filter(visit=>(typeof visit==='string'?visit:visit?.obstacleId)===obstacle.id).length:0;
-    const badges=Math.max(1,visits),entrySide=obstacleEntrySide(obstacle,state),badgeOffset=depth/2+.48,badgeX=x+entrySide*(-badgeOffset*Math.sin(angle))*pxX,badgeY=y+entrySide*(badgeOffset*Math.cos(angle))*pxY;
+    const visits=Array.isArray(state.route)?state.route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id):[];
+    const badges=visits.length?visits:[{visit:null,index:null}],badgeOffset=depth/2+.48;
     ctx.fillStyle='#284638';ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.font='700 11px "DM Sans", sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-    for(let i=0;i<badges;i++){const bx=badgeX+(i-(badges-1)/2)*23;ctx.beginPath();ctx.arc(bx,badgeY,12,0,Math.PI*2);ctx.fill();if(badges>1)ctx.stroke();ctx.fillStyle='#fff';ctx.fillText(obstacle.n,bx,badgeY);ctx.fillStyle='#284638'}
+    for(let i=0;i<badges.length;i++){const {visit,index}=badges[i],side=obstacleEntrySide(obstacle,state,index),bx=x+side*(-badgeOffset*Math.sin(angle))*pxX+(i-(badges.length-1)/2)*23,by=y+side*badgeOffset*Math.cos(angle)*pxY,n=Number.isInteger(visit?.n)?visit.n:obstacle.n;ctx.beginPath();ctx.arc(bx,by,12,0,Math.PI*2);ctx.fill();if(badges.length>1)ctx.stroke();ctx.fillStyle='#fff';ctx.fillText(n,bx,by);ctx.fillStyle='#284638'}
   }
   ctx.fillStyle = '#26352f'; ctx.font = '600 9px "DM Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.fillText(label.length > 19 ? `${label.slice(0, 18)}…` : label, x - Math.sin(angle) * labelOffset, y + Math.cos(angle) * labelOffset, Math.max(88, width * pxX + 18));
