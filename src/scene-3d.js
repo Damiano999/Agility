@@ -98,13 +98,10 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
       const steps = ['aFrame', 'dogWalk', 'seesaw'].includes(obstacle.type) ? 32 : 1;
       localPoints = Array.from({ length: steps + 1 }, (_, i) => {
         const z = (i / steps - .5) * depth, abs = Math.abs(z);
-        let y = obstacle.type === 'aFrame' ? .08 + 1.7 * Math.max(0, 1 - abs / (depth / 2))
-          : obstacle.type === 'dogWalk' ? .08 + 1.21 * Math.max(0, 1 - Math.max(0, abs - 1.825) / 3.65)
-            : obstacle.type === 'seesaw' ? .64 - z * Math.sin(.08)
-              : obstacle.type === 'wall' ? .65 : obstacle.type === 'longJump' ? .2
-                : obstacle.type === 'tire' ? .8 : obstacle.type === 'tunnel' ? .32
-                  : obstacle.type === 'chute' ? .28 : obstacle.type === 'spread' ? .65
-                    : .55;
+        let y;
+        if(obstacle.type==='aFrame'){const height=Math.max(1.2,Math.min(2,Number(obstacle.height)||1.7));y=.08+height*Math.max(0,1-abs/(depth/2))}
+        else if(obstacle.type==='dogWalk'){const height=Math.max(.8,Math.min(1.3,Number(obstacle.height)||1.2)),rampLength=3.65,run=Math.sqrt(rampLength**2-height**2),deckHalf=1.825;y=.08+(abs<=deckHalf?height:height*Math.max(0,1-(abs-deckHalf)/run))}
+        else y=obstacle.type==='seesaw'?.64-z*Math.sin(.08):obstacle.type==='wall'?.65:obstacle.type==='longJump'?.2:obstacle.type==='tire'?.8:obstacle.type==='tunnel'?.32:obstacle.type==='chute'?.28:obstacle.type==='spread'?.65:.55;
         return new THREE.Vector3(0, y, z);
       });
     }
@@ -155,23 +152,21 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
         for (const x of [-.4, .4]) { addBox(g, charcoal, x, .4, 0, .045, .8, .06); addBox(g, charcoal, x, .04, 0, .4, .08, .36); }
         break;
       }
-      case 'aFrame': addRamp(g, 0, -1); addRamp(g, 0, 1); break;
+      case 'aFrame': { const height = Math.max(1.2, Math.min(2, Number(obstacle.height) || 1.7)); addRamp(g, 0, -1, .9, 2.7, height); addRamp(g, 0, 1, .9, 2.7, height); break; }
       case 'dogWalk': {
-        const rampAngle = Math.asin(1.2 / 3.65);
-        addBox(g, teal, 0, 1.24, 0, .3, .1, 3.65);
+        const height = Math.max(.8, Math.min(1.3, Number(obstacle.height) || 1.2)), rampLength = 3.65;
+        const rampAngle = Math.asin(height / rampLength), horizontal = rampLength * Math.cos(rampAngle), deckHalf = 3.65 / 2;
+        addBox(g, teal, 0, height, 0, .3, .1, 3.65);
         for (const sign of [-1, 1]) {
-          // Inner ramp ends meet the raised deck; outer ends meet the ground.
-          const ramp = addBox(g, teal, 0, .64, sign * 3.5, .3, .09, 3.65); ramp.rotation.x = sign * rampAngle;
-          const contactY = .64 - (4.95 - 3.5) * Math.sin(rampAngle);
-          const contact = addBox(g, '#f1bf55', 0, contactY, sign * 4.95, .3, .035, .9); contact.rotation.x = sign * rampAngle;
+          const rampCenterZ = sign * (deckHalf + horizontal / 2), rampCenterY = height / 2;
+          const ramp = addBox(g, teal, 0, rampCenterY, rampCenterZ, .3, .09, rampLength); ramp.rotation.x = sign * rampAngle;
+          const contactLength = .9, contact = addBox(g, '#f1bf55', 0, contactLength * Math.sin(rampAngle) / 2 + .02, sign * (deckHalf + horizontal - contactLength * Math.cos(rampAngle) / 2), .3, .035, contactLength); contact.rotation.x = sign * rampAngle;
           for (let i = 0; i < 10; i++) {
-            const along = 1.9 + i * .3, z = sign * along, y = .64 + (3.5 - along) * Math.sin(rampAngle);
+            const along = .22 + i * .3, z = sign * (deckHalf + along * Math.cos(rampAngle)), y = height - along * Math.sin(rampAngle);
             const slat = addBox(g, '#d4eee0', 0, y + .05, z, .29, .025, .035); slat.rotation.x = sign * rampAngle;
           }
-          const supportTop = .64 + (3.5 - 2.4) * Math.sin(rampAngle) - .045;
-          addBox(g, charcoal, 0, supportTop / 2, sign * 2.4, .07, supportTop, .07);
         }
-        for (const sign of [-1, 1]) addBox(g, charcoal, 0, .62, sign * 1.5, .5, 1.2, .05);
+        for (const sign of [-1, 1]) addBox(g, charcoal, 0, height / 2, sign * 1.15, .5, height - .1, .05);
         break;
       }
       case 'seesaw': {
@@ -206,15 +201,17 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
     g.rotation.y = -(Number(obstacle.rotation) || 0) * Math.PI / 180;
     const pos = createObstacleBadge(g, obstacle);
     g.userData.badge = pos;
-    g.userData.badgeSignature = `${obstacle.n}|${obstacle.label || ''}`;
-    g.userData.geometrySignature = `${obstacle.type}|${obstacle.length || ''}|${obstacle.bend || ''}`;
+    g.userData.badgeSignature = obstacleBadgeSignature(obstacle);
+    g.userData.geometrySignature = `${obstacle.type}|${obstacle.length || ''}|${obstacle.bend || ''}|${obstacle.height || ''}`;
     g.traverse(obj => { if (obj.isMesh) { obj.userData.obstacleId = obstacle.id; obj.castShadow = true; } });
     return g;
   }
+  function obstacleVisitCount(obstacle,s=getState()){const route=Array.isArray(s.route)?s.route:[],count=route.filter(visit=>(typeof visit==='string'?visit:visit?.obstacleId)===obstacle.id).length;return Math.max(1,count)}
+  function obstacleBadgeSignature(obstacle){return `${obstacle.n}|${obstacle.label||''}|${obstacleVisitCount(obstacle)}`}
   function createObstacleBadge(group, obstacle) {
-    const pos = createLabel(`${obstacle.n}${obstacle.label ? ` · ${obstacle.label}` : ''}`, '#fff8e8', '#234238');
-    pos.position.set(0, obstacle.type === 'aFrame' ? 2.15 : obstacle.type === 'dogWalk' ? 1.75 : 1.3, 0);
-    pos.scale.set(1.45, .34, 1); group.add(pos); return pos;
+    const badges=new THREE.Group(),count=obstacleVisitCount(obstacle),height=Number(obstacle.height)||(obstacle.type==='dogWalk'?1.2:1.7);
+    for(let i=0;i<count;i++){const badge=createLabel(`${obstacle.n}${obstacle.label?` · ${obstacle.label}`:''}`, '#fff8e8', '#234238');badge.position.x=(i-(count-1)/2)*.52;badge.scale.set(1.45,.34,1);badges.add(badge)}
+    badges.position.y=obstacle.type==='aFrame'?height+.42:obstacle.type==='dogWalk'?height+.42:1.3;group.add(badges);return badges;
   }
   function createLabel(text, foreground = '#f3f7ee', background = '#1b2b25') {
     const c = document.createElement('canvas'); c.width = 512; c.height = 128;
@@ -243,6 +240,9 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
       for (let z = -W / 2; z <= W / 2 + .001; z += step) { points.push(new THREE.Vector3(-L / 2, .032, z), new THREE.Vector3(L / 2, .032, z)); }
       const geom = new THREE.BufferGeometry().setFromPoints(points);
       floorGroup.add(new THREE.LineSegments(geom, new THREE.LineBasicMaterial({ color: '#697960', transparent: true, opacity: .28 })));
+      const labelStep=step*Math.max(1,Math.ceil(Math.max(L,W)/16/step));
+      for(let x=0;x<=L+.001;x+=labelStep){const label=createLabel(`${x.toFixed(1).replace('.',',')} m`,'#eef4e8','#34483b');label.position.set(-L/2+x,.07,W/2-.15);label.scale.set(.72,.18,1);floorGroup.add(label)}
+      for(let z=0;z<=W+.001;z+=labelStep){const label=createLabel(`${z.toFixed(1).replace('.',',')} m`,'#eef4e8','#34483b');label.position.set(-L/2+.2,.07,W/2-z);label.scale.set(.72,.18,1);floorGroup.add(label)}
     }
     floorGroup.userData.signature = `${L}|${W}|${s.grid}|${s.gridSize}|${s.unit}`;
     const radius = Math.hypot(L, W) * 1.4;
@@ -252,7 +252,8 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
   }
   function buildRoute(s) {
     clearGroup(routeGroup);
-    const ordered = [...s.obstacles].sort((a, b) => a.n - b.n);
+    const byId=new Map(s.obstacles.map(o=>[o.id,o])),visits=Array.isArray(s.route)?s.route.map(visit=>typeof visit==='string'?visit:visit?.obstacleId).filter(key=>byId.has(key)):[];
+    const ordered = visits.length?visits.map(key=>byId.get(key)):[...s.obstacles].sort((a, b) => a.n - b.n);
     if ((s.showRoute || s.showDistances) && ordered.length > 1) {
       for (let i = 0; i < ordered.length - 1; i++) {
         const a = ordered[i], b = ordered[i + 1], prev = ordered[i - 1] || a, next = ordered[i + 2] || b;
@@ -310,13 +311,13 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
     for (const obstacle of s.obstacles) {
       liveIds.add(obstacle.id);
       let g = obstacleGroup.children.find(child => child.userData.obstacleId === obstacle.id);
-      const geometrySignature = `${obstacle.type}|${obstacle.length || ''}|${obstacle.bend || ''}`;
+      const geometrySignature = `${obstacle.type}|${obstacle.length || ''}|${obstacle.bend || ''}|${obstacle.height || ''}`;
       if (!g || g.userData.geometrySignature !== geometrySignature) {
         if (g) { obstacleGroup.remove(g); disposeObject(g); }
         g = makeObstacle(obstacle); obstacleGroup.add(g);
-      } else if (g.userData.badgeSignature !== `${obstacle.n}|${obstacle.label || ''}`) {
-        g.remove(g.userData.badge); g.userData.badge?.material?.map?.dispose(); g.userData.badge?.material?.dispose();
-        g.userData.badge = createObstacleBadge(g, obstacle); g.userData.badgeSignature = `${obstacle.n}|${obstacle.label || ''}`;
+      } else if (g.userData.badgeSignature !== obstacleBadgeSignature(obstacle)) {
+        g.remove(g.userData.badge); g.userData.badge?.traverse?.(item=>{item.material?.map?.dispose?.();item.material?.dispose?.()});
+        g.userData.badge = createObstacleBadge(g, obstacle); g.userData.badgeSignature = obstacleBadgeSignature(obstacle);
       }
       g.userData.badge.visible = !!s.showNumbers;
       g.position.set((obstacle.x - .5) * L, .045, (obstacle.y - .5) * W);
@@ -394,4 +395,3 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
   const observer = new ResizeObserver(() => update(getState())); observer.observe(canvas.parentElement);
   return { update, renderer, dispose() { observer.disconnect(); clearGroup(obstacleGroup); clearGroup(routeGroup); clearGroup(floorGroup); renderer.dispose(); } };
 }
-
