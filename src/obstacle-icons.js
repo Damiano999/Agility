@@ -31,12 +31,23 @@ export function tunnelPath(length, bendDegrees, steps = 36) {
 
 export function obstacleFootprint(obstacle) {
   const length = Number(obstacle.length) || 4.5;
+  const height = obstacle.type === 'dogWalk'
+    ? Math.max(.8, Math.min(1.3, Number(obstacle.height) || 1.2))
+    : Math.max(1.2, Math.min(2, Number(obstacle.height) || 1.7));
   const bend = Math.max(0, Math.min(150, Number(obstacle.bend) || 0)) * Math.PI / 180;
   const footprints = {
     jump: [1.3, .6], spread: [1.3, .5], wall: [1.2, .4],
-    longJump: [1.5, 1.5], tire: [1.1, .4], aFrame: [.9, 5.4], dogWalk: [.3, 10.6],
+    longJump: [1.5, 1.5], tire: [1.1, .4],
     seesaw: [.3, 3.7], weave: [6.6, .6],
   };
+  if (obstacle.type === 'aFrame') {
+    const rampLength = 2.7, run = Math.sqrt(Math.max(.01, rampLength ** 2 - Math.min(height, rampLength - .01) ** 2));
+    return { width: .9, depth: run * 2 };
+  }
+  if (obstacle.type === 'dogWalk') {
+    const rampLength = 3.65, run = Math.sqrt(Math.max(.01, rampLength ** 2 - Math.min(height, rampLength - .01) ** 2));
+    return { width: .3, depth: 3.65 + run * 2 };
+  }
   if (obstacle.type === 'tunnel') {
     const angle = bend;
     if (angle < .001) return { width: .6, depth: length };
@@ -121,12 +132,11 @@ export function drawObstacle(ctx, canvas, obstacle, selected, state) {
 
   const labelOffset = Math.max(26, depth * pxY / 2 + 12);
   if (state.showNumbers) {
-    ctx.beginPath(); ctx.arc(x + width * pxX / 2, y - depth * pxY / 2, 12, 0, Math.PI * 2);
-    ctx.fillStyle = '#284638'; ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = '700 11px "DM Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(obstacle.n, x + width * pxX / 2, y - depth * pxY / 2);
+    const visits=Array.isArray(state.route)?state.route.filter(visit=>(typeof visit==='string'?visit:visit?.obstacleId)===obstacle.id).length:0;
+    const badges=Math.max(1,visits),badgeX=x+width*pxX/2, badgeY=y-depth*pxY/2;
+    ctx.fillStyle='#284638';ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.font='700 11px "DM Sans", sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    for(let i=0;i<badges;i++){const bx=badgeX+(i-(badges-1)/2)*23;ctx.beginPath();ctx.arc(bx,badgeY,12,0,Math.PI*2);ctx.fill();if(badges>1)ctx.stroke();ctx.fillStyle='#fff';ctx.fillText(obstacle.n,bx,badgeY);ctx.fillStyle='#284638'}
   }
   ctx.fillStyle = '#26352f'; ctx.font = '600 9px "DM Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.fillText(label.length > 19 ? `${label.slice(0, 18)}…` : label, x, y + labelOffset, Math.max(88, width * pxX + 18));
 }
-
