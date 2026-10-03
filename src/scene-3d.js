@@ -87,7 +87,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
     }
     return new THREE.CatmullRomCurve3(pts);
   }
-  function obstacleTraversal(s, nodes, index, L, W) {
+  function obstacleTraversal(s, nodes, index, L, W, beforeOverride, afterOverride) {
     const obstacle = nodes[index];
     const rotation = (Number(obstacle.rotation) || 0) * Math.PI / 180;
     const { depth } = obstacleFootprint(obstacle);
@@ -108,7 +108,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
     const cx = (obstacle.x - .5) * L, cz = (obstacle.y - .5) * W;
     const points = localPoints.map(p => new THREE.Vector3(cx + p.x * Math.cos(rotation) - p.z * Math.sin(rotation), p.y, cz + p.x * Math.sin(rotation) + p.z * Math.cos(rotation)));
     const center = item => new THREE.Vector3((item.x - .5) * L, .32, (item.y - .5) * W);
-    const before = nodes[index - 1], after = nodes[index + 1];
+    const before = beforeOverride || nodes[index - 1], after = afterOverride || nodes[index + 1];
     let enterFromStart = true;
     if (before) enterFromStart = points[0].distanceTo(center(before)) < points.at(-1).distanceTo(center(before));
     else if (after) enterFromStart = points.at(-1).distanceTo(center(after)) < points[0].distanceTo(center(after));
@@ -256,12 +256,12 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
     clearGroup(routeGroup);
     const byId=new Map(s.obstacles.map(o=>[o.id,o])),visits=Array.isArray(s.route)?s.route.map(visit=>typeof visit==='string'?visit:visit?.obstacleId).filter(key=>byId.has(key)):[];
     const ordered = visits.length?visits.map(key=>byId.get(key)):[...s.obstacles].sort((a, b) => a.n - b.n);
+    const groups=[];for(let i=0;i<ordered.length;i++){const o=ordered[i],last=groups.at(-1);if(last&&Number(last[0].o.n)===Number(o.n)&&last.some(item=>item.o.id!==o.id))last.push({o,index:i});else groups.push([{o,index:i}])}const links=[];for(let i=0;i<groups.length-1;i++)for(const aa of groups[i])for(const bb of groups[i+1])links.push({ai:aa.index,bi:bb.index,a:aa.o,b:bb.o,prev:groups[i-1]?.[0].o||aa.o,next:groups[i+2]?.[0].o||bb.o});
     if ((s.showRoute || s.showDistances) && ordered.length > 1) {
-      for (let i = 0; i < ordered.length - 1; i++) {
-        const a = ordered[i], b = ordered[i + 1], prev = ordered[i - 1] || a, next = ordered[i + 2] || b;
+      for (const {ai,bi,a,b,prev,next} of links) {
         const unitScale = s.unit === 'ft' ? .3048 : 1, L = s.length * unitScale, W = s.width * unitScale;
-        const ta = obstacleTraversal(s, ordered, i, L, W);
-        const tb = obstacleTraversal(s, ordered, i + 1, L, W);
+        const ta = obstacleTraversal(s, ordered, ai, L, W, prev, b);
+        const tb = obstacleTraversal(s, ordered, bi, L, W, a, next);
         const p0 = ta ? ta.exit.clone() : new THREE.Vector3((a.x - .5) * L, .08, (a.y - .5) * W);
         const p3 = tb ? tb.entry.clone() : new THREE.Vector3((b.x - .5) * L, .08, (b.y - .5) * W);
         const pp = new THREE.Vector3((prev.x - .5) * L, .08, (prev.y - .5) * W);
@@ -297,10 +297,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onDo
         }
       }
       if (s.showRoute && ordered.length) {
-        const first = obstacleTraversal(s, ordered, 0, s.length * (s.unit === 'ft' ? .3048 : 1), s.width * (s.unit === 'ft' ? .3048 : 1));
-        const inside = new THREE.CatmullRomCurve3(first.points);
-        const line = new THREE.Mesh(new THREE.TubeGeometry(inside, Math.max(8, first.points.length * 2), .035, 6, false), mat(s.path || '#f07851', .48));
-        line.material.depthTest = false; line.renderOrder = 5; routeGroup.add(line);
+        for(const item of groups[0]){const first=obstacleTraversal(s,ordered,item.index,s.length*(s.unit==='ft'?.3048:1),s.width*(s.unit==='ft'?.3048:1),null,groups[1]?.[0].o),inside=new THREE.CatmullRomCurve3(first.points),line=new THREE.Mesh(new THREE.TubeGeometry(inside,Math.max(8,first.points.length*2),.035,6,false),mat(s.path||'#f07851',.48));line.material.depthTest=false;line.renderOrder=5;routeGroup.add(line)}
       }
     }
   }
