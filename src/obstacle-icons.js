@@ -150,7 +150,7 @@ export function drawObstacle(ctx, canvas, obstacle, selected, state) {
   const labelOffset = Math.max(26, depth * pxY / 2 + 12);
   if (state.showNumbers) {
     const visits=Array.isArray(state.route)?state.route.filter(visit=>(typeof visit==='string'?visit:visit?.obstacleId)===obstacle.id).length:0;
-    const badges=Math.max(1,visits),entrySide=obstacleEntrySide(obstacle,state),badgeX=x+entrySide*(-depth/2*Math.sin(angle))*pxX,badgeY=y+entrySide*(depth/2*Math.cos(angle))*pxY;
+    const badges=Math.max(1,visits),entrySide=obstacleEntrySide(obstacle,state),badgeOffset=depth/2+.48,badgeX=x+entrySide*(-badgeOffset*Math.sin(angle))*pxX,badgeY=y+entrySide*(badgeOffset*Math.cos(angle))*pxY;
     ctx.fillStyle='#284638';ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.font='700 11px "DM Sans", sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
     for(let i=0;i<badges;i++){const bx=badgeX+(i-(badges-1)/2)*23;ctx.beginPath();ctx.arc(bx,badgeY,12,0,Math.PI*2);ctx.fill();if(badges>1)ctx.stroke();ctx.fillStyle='#fff';ctx.fillText(obstacle.n,bx,badgeY);ctx.fillStyle='#284638'}
   }
