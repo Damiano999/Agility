@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { obstacleFootprint, obstacleEntrySide } from './obstacle-icons.js?v=agility-number-beside-entry-20261003';
+import { obstacleFootprint, obstacleEntrySide } from './obstacle-icons.js?v=agility-specific-visit-number-20261003';
 
 const obstacleColors = {
   jump: '#f2aa42', spread: '#f2aa42', wall: '#ed7863', longJump: '#ef9c4e',
@@ -209,11 +209,11 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     return g;
   }
   function obstacleVisitCount(obstacle,s=getState()){const route=Array.isArray(s.route)?s.route:[],count=route.filter(visit=>(typeof visit==='string'?visit:visit?.obstacleId)===obstacle.id).length;return Math.max(1,count)}
-  function obstacleBadgeSignature(obstacle){return `${obstacle.n}|${obstacle.label||''}|${obstacleVisitCount(obstacle)}`}
+  function obstacleBadgeSignature(obstacle){const route=Array.isArray(getState().route)?getState().route:[],numbers=route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id).map(item=>Number.isInteger(item.visit?.n)?item.visit.n:obstacle.n);return `${obstacle.n}|${obstacle.label||''}|${numbers.join(',')}`}
   function createObstacleBadge(group, obstacle) {
-    const badges=new THREE.Group(),count=obstacleVisitCount(obstacle),height=Number(obstacle.height)||(obstacle.type==='dogWalk'?1.2:1.7),entrySide=obstacleEntrySide(obstacle,getState()),depth=obstacleFootprint(obstacle).depth;
-    for(let i=0;i<count;i++){const badge=createLabel(`${obstacle.n}${obstacle.label?` · ${obstacle.label}`:''}`, '#fff8e8', '#234238');badge.userData.obstacleId=obstacle.id;badge.userData.numberBadge=true;badge.position.x=(i-(count-1)/2)*.52;badge.scale.set(1.45,.34,1);badges.add(badge)}
-    badges.position.y=obstacle.type==='aFrame'?height+.42:obstacle.type==='dogWalk'?height+.42:1.3;badges.position.z=entrySide*(depth/2+.62);group.add(badges);return badges;
+    const badges=new THREE.Group(),s=getState(),route=Array.isArray(s.route)?s.route:[],visits=route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id),items=visits.length?visits:[{visit:null,index:null}],height=Number(obstacle.height)||(obstacle.type==='dogWalk'?1.2:1.7),depth=obstacleFootprint(obstacle).depth;
+    for(let i=0;i<items.length;i++){const {visit,index}=items[i],number=Number.isInteger(visit?.n)?visit.n:obstacle.n,badge=createLabel(`${number}${obstacle.label?` · ${obstacle.label}`:''}`, '#fff8e8', '#234238');badge.userData.obstacleId=obstacle.id;badge.userData.visitIndex=index;badge.userData.numberBadge=true;badge.position.x=(i-(items.length-1)/2)*.52;badge.position.z=obstacleEntrySide(obstacle,s,index)*(depth/2+.62);badge.scale.set(1.45,.34,1);badges.add(badge)}
+    badges.position.y=obstacle.type==='aFrame'?height+.42:obstacle.type==='dogWalk'?height+.42:1.3;group.add(badges);return badges;
   }
   function createLabel(text, foreground = '#f3f7ee', background = '#1b2b25') {
     const c = document.createElement('canvas'); c.width = 512; c.height = 128;
@@ -254,8 +254,8 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   }
   function buildRoute(s) {
     clearGroup(routeGroup);
-    const byId=new Map(s.obstacles.map(o=>[o.id,o])),visits=Array.isArray(s.route)?s.route.map(visit=>typeof visit==='string'?visit:visit?.obstacleId).filter(key=>byId.has(key)):[];
-    const ordered = visits.length?visits.map(key=>byId.get(key)):[...s.obstacles].sort((a, b) => a.n - b.n);
+    const byId=new Map(s.obstacles.map(o=>[o.id,o])),visits=Array.isArray(s.route)?s.route.map((visit,index)=>({visit,index,key:typeof visit==='string'?visit:visit?.obstacleId})).filter(item=>byId.has(item.key)):[];
+    const ordered = visits.length?visits.map(({visit,index,key})=>({...byId.get(key),n:Number.isInteger(visit?.n)?visit.n:byId.get(key).n,_visitIndex:index,_visitKey:`${key}@${index}`})):[...s.obstacles].sort((a, b) => a.n - b.n);
     const groups=[];for(let i=0;i<ordered.length;i++){const o=ordered[i],last=groups.at(-1);if(last&&Number(last[0].o.n)===Number(o.n)&&last.some(item=>item.o.id!==o.id))last.push({o,index:i});else groups.push([{o,index:i}])}const links=[];for(let i=0;i<groups.length-1;i++)for(const aa of groups[i])for(const bb of groups[i+1])links.push({ai:aa.index,bi:bb.index,a:aa.o,b:bb.o,prev:groups[i-1]?.[0].o||aa.o,next:groups[i+2]?.[0].o||bb.o});
     if ((s.showRoute || s.showDistances) && ordered.length > 1) {
       for (const {ai,bi,a,b,prev,next} of links) {
@@ -342,7 +342,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   canvas.addEventListener('pointerdown', e => {
     ray(e);
     const intersections=caster.intersectObjects(obstacleGroup.children,true),badgeHit=intersections.find(h=>h.object.userData.numberBadge);
-    if(badgeHit&&getState().showNumbers){const id=badgeHit.object.userData.obstacleId;onSelect(id);onEditNumber?.(id);e.preventDefault();return}
+    if(badgeHit&&getState().showNumbers){const id=badgeHit.object.userData.obstacleId;onSelect(id);onEditNumber?.(id,badgeHit.object.userData.visitIndex??null);e.preventDefault();return}
     if (getState().tool === 'route') {
       caster.params.Line = { threshold: .18 };
       const hits = caster.intersectObjects(routeGroup.children, true).filter(h => h.object.userData.routeKey);
