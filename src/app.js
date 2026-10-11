@@ -1,7 +1,7 @@
 import { drawObstacle, obstacleFootprint, obstacleEntrySide, tunnelPath } from './obstacle-icons.js?v=agility-independent-courses-20261011';
 (()=>{'use strict';
 const $=s=>document.querySelector(s), canvas=$('#courseCanvas'),ctx=canvas.getContext('2d'),frame=$('#frame'),canvasWrap=$('#canvasWrap');
-const boardLogoImage=.board-logo img;
+const boardLogoImage=document.querySelector('.board-logo img');
 const names={jump:'Skok pojedynczy',spread:'Skok podwójny',wall:'Ściana / panel',longJump:'Skok w dal',tire:'Koło',aFrame:'Palizada A',dogWalk:'Kładka',seesaw:'Huśtawka',tunnel:'Tunel otwarty',weave:'Slalom'};
 let state={title:'Mój pierwszy tor',length:40,width:24,gridSize:2,unit:'m',bg:'#f3eefb',ob:'#59456f',path:'#8b5cf6',grid:true,showRoute:true,showNumbers:true,showDistances:false,obstacles:[],route:[],routeBends:{},selected:null,tool:'select',zoom:100,view:'2d',courses:[],activeCourseId:null};
 let hist=[],future=[],drag=null,dragCurve=null,dragRotation=null,changedTimer,toastTimer,scene3d=null,scene3dLoading=null;
