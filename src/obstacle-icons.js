@@ -150,8 +150,8 @@ export function drawObstacle(ctx, canvas, obstacle, selected, state) {
   ctx.scale(pxX, pxY);
 
   if (selected) {
-    ctx.fillStyle = '#f078511c';
-    ctx.strokeStyle = '#e56d49'; ctx.lineWidth = .025; ctx.setLineDash([.12, .08]);
+    ctx.fillStyle = '#8b5cf61c';
+    ctx.strokeStyle = '#9f69d5'; ctx.lineWidth = .025; ctx.setLineDash([.12, .08]);
     ctx.beginPath(); ctx.rect(-width / 2 - .12, -depth / 2 - .12, width + .24, depth + .24); ctx.fill(); ctx.stroke();
     ctx.setLineDash([]);
   }
@@ -164,10 +164,9 @@ export function drawObstacle(ctx, canvas, obstacle, selected, state) {
   if (state.showNumbers) {
     const visits=Array.isArray(state.route)?state.route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id):[];
     const badges=visits.length?visits:[{visit:null,index:null}],badgeOffset=depth/2+.95;
-    ctx.fillStyle='#284638';ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.font='700 11px "DM Sans", sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-    for(let i=0;i<badges.length;i++){const {visit,index}=badges[i],side=obstacleEntrySide(obstacle,state,index),bx=x+side*(-badgeOffset*Math.sin(angle))*pxX+(i-(badges.length-1)/2)*23,by=y+side*badgeOffset*Math.cos(angle)*pxY,n=Number.isInteger(visit?.n)?visit.n:obstacle.n;ctx.beginPath();ctx.arc(bx,by,12,0,Math.PI*2);ctx.fill();if(badges.length>1)ctx.stroke();ctx.fillStyle='#fff';ctx.fillText(n,bx,by);ctx.fillStyle='#284638'}
+    ctx.fillStyle='#4b3864';ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.font='700 11px "DM Sans", sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    for(let i=0;i<badges.length;i++){const {visit,index}=badges[i],side=obstacleEntrySide(obstacle,state,index)*(visit?.reverse===true?-1:1),bx=x+side*(-badgeOffset*Math.sin(angle))*pxX+(i-(badges.length-1)/2)*23,by=y+side*badgeOffset*Math.cos(angle)*pxY,n=Number.isInteger(visit?.n)?visit.n:obstacle.n;ctx.beginPath();ctx.arc(bx,by,12,0,Math.PI*2);ctx.fill();if(badges.length>1)ctx.stroke();ctx.fillStyle='#fff';ctx.fillText(n,bx,by);ctx.fillStyle='#4b3864'}
   }
-  ctx.fillStyle = '#26352f'; ctx.font = '600 9px "DM Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillStyle = '#392653'; ctx.font = '600 9px "DM Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.fillText(label.length > 19 ? `${label.slice(0, 18)}…` : label, x - Math.sin(angle) * labelOffset, y + Math.cos(angle) * labelOffset, Math.max(88, width * pxX + 18));
 }
-
