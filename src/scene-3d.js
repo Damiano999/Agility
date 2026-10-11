@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { obstacleFootprint, obstacleEntrySide } from './obstacle-icons.js?v=agility-double-jump-icon-20261003';
+import { obstacleFootprint, obstacleEntrySide } from './obstacle-icons.js?v=agility-multi-courses-20261011';
 
 const obstacleColors = {
   jump: '#f2aa42', spread: '#f2aa42', wall: '#ed7863', longJump: '#ef9c4e',
@@ -254,11 +254,13 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   }
   function buildRoute(s) {
     clearGroup(routeGroup);
-    const byId=new Map(s.obstacles.map(o=>[o.id,o])),visits=Array.isArray(s.route)?s.route.map((visit,index)=>({visit,index,key:typeof visit==='string'?visit:visit?.obstacleId})).filter(item=>byId.has(item.key)):[];
-    const ordered = visits.length?visits.map(({visit,index,key})=>({...byId.get(key),n:Number.isInteger(visit?.n)?visit.n:byId.get(key).n,_visitIndex:index,_visitKey:`${key}@${index}`})):[...s.obstacles].sort((a, b) => a.n - b.n);
-    const groups=[];for(let i=0;i<ordered.length;i++){const o=ordered[i],last=groups.at(-1);if(last&&Number(last[0].o.n)===Number(o.n)&&last.some(item=>item.o.id!==o.id))last.push({o,index:i});else groups.push([{o,index:i}])}groups.forEach(group=>group.forEach((item,variantIndex)=>item.variantIndex=variantIndex));const choices=groups.map(()=>0),paths=[{choices:[...choices],alternate:false}];groups.forEach((group,groupIndex)=>group.slice(1).forEach(item=>{const branch=[...choices];branch[groupIndex]=item.variantIndex;paths.push({choices:branch,alternate:true})}));const links=[];for(let g=0;g<groups.length-1;g++)for(const path of paths){const aa=groups[g][path.choices[g]],bb=groups[g+1][path.choices[g+1]];links.push({ai:aa.index,bi:bb.index,a:aa.o,b:bb.o,alternate:path.alternate,prev:groups[g-1]?.[path.choices[g-1]]?.o||aa.o,next:groups[g+2]?.[path.choices[g+2]]?.o||bb.o})}
-    if ((s.showRoute || s.showDistances) && ordered.length > 1) {
-      for (const {ai,bi,a,b,prev,next,alternate} of links) {
+    const byId=new Map(s.obstacles.map(o=>[o.id,o])),courses=(Array.isArray(s.courses)&&s.courses.length?s.courses:[{id:s.activeCourseId||'main',route:s.route,color:s.path,routeBends:s.routeBends,visible:true}]).filter(course=>course.visible!==false);
+    for(const course of courses){
+      const routeState={...s,route:course.route||[],routeBends:course.routeBends||{},path:course.color||s.path},visits=Array.isArray(routeState.route)?routeState.route.map((visit,index)=>({visit,index,key:typeof visit==='string'?visit:visit?.obstacleId})).filter(item=>byId.has(item.key)):[];
+      const ordered=visits.length?visits.map(({visit,index,key})=>({...byId.get(key),n:Number.isInteger(visit?.n)?visit.n:byId.get(key).n,_visitIndex:index,_visitKey:`${key}@${index}`})):course.automatic===false?[]:[...s.obstacles].sort((a,b)=>a.n-b.n);
+      const links=ordered.slice(0,-1).map((a,i)=>({ai:i,bi:i+1,a,b:ordered[i+1],prev:ordered[i-1]||a,next:ordered[i+2]||ordered[i+1]}));
+      if ((s.showRoute || s.showDistances) && ordered.length > 1) {
+      for (const {ai,bi,a,b,prev,next} of links) {
         const unitScale = s.unit === 'ft' ? .3048 : 1, L = s.length * unitScale, W = s.width * unitScale;
         const ta = obstacleTraversal(s, ordered, ai, L, W, prev, b);
         const tb = obstacleTraversal(s, ordered, bi, L, W, a, next);
@@ -268,21 +270,21 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
         const pn = new THREE.Vector3((next.x - .5) * L, .08, (next.y - .5) * W);
         const delta = new THREE.Vector3().subVectors(p3, p0), len = Math.max(.01, delta.length());
         const normal = new THREE.Vector3(delta.z, 0, -delta.x).normalize();
-        const offset = (s.routeBends?.[`${a.id}:${b.id}`] || 0) * Math.min(L, W);
+        const offset = (routeState.routeBends?.[`${a.id}:${b.id}`] || 0) * Math.min(L, W);
         const align = len * .2, ra = (Number(a.rotation) || 0) * Math.PI / 180, rb = (Number(b.rotation) || 0) * Math.PI / 180;
         const startTangent = ta && ta.exit.clone().sub(ta.points.at(-2)).normalize(), endTangent = tb && tb.points[1].clone().sub(tb.entry).normalize();
         const c1 = p0.clone().add(startTangent ? startTangent.multiplyScalar(align) : new THREE.Vector3(p3.x - pp.x, 0, p3.z - pp.z).multiplyScalar(.18).add(new THREE.Vector3(Math.cos(ra) * align, 0, Math.sin(ra) * align))).add(normal.clone().multiplyScalar(offset));
         const c2 = p3.clone().sub(endTangent ? endTangent.multiplyScalar(align) : new THREE.Vector3(pn.x - p0.x, 0, pn.z - p0.z).multiplyScalar(.18).add(new THREE.Vector3(Math.cos(rb) * align, 0, Math.sin(rb) * align))).add(normal.clone().multiplyScalar(offset));
         const curve = new THREE.CubicBezierCurve3(p0, c1, c2, p3);
         if (s.showRoute) {
-          const routeColor=alternate?'#397fd0':s.path||'#f07851';
+          const routeColor=course.color||s.path||'#f07851';
           const line = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, .035, 6, false), mat(routeColor, .48));
-          line.userData.routeKey = `${a.id}:${b.id}`; line.userData.routeNormal = normal; routeGroup.add(line);
+          if(course.id===s.activeCourseId)line.userData.routeKey = `${a.id}:${b.id}`; line.userData.routeNormal = normal; routeGroup.add(line);
           if (tb) {
             const inside = new THREE.CatmullRomCurve3(tb.points);
             const tunnelLine = new THREE.Mesh(new THREE.TubeGeometry(inside, 40, .035, 6, false), mat(routeColor, .48));
             tunnelLine.material.depthTest = false; tunnelLine.renderOrder = 5;
-            tunnelLine.userData.routeKey = `${a.id}:${b.id}`; tunnelLine.userData.routeNormal = normal; routeGroup.add(tunnelLine);
+            if(course.id===s.activeCourseId)tunnelLine.userData.routeKey = `${a.id}:${b.id}`; tunnelLine.userData.routeNormal = normal; routeGroup.add(tunnelLine);
           }
         }
         if (s.showDistances) {
@@ -291,15 +293,16 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
           for (let j = 1; j < samples.length; j++) meters += samples[j].distanceTo(samples[j - 1]);
           const amount = s.unit === 'ft' ? meters / .3048 : meters;
           const measurement = new THREE.BufferGeometry().setFromPoints(samples);
-          const measureLine = new THREE.Line(measurement, new THREE.LineDashedMaterial({ color: '#63d4bf', dashSize: .28, gapSize: .18, transparent: true, opacity: .88 }));
+          const measureLine = new THREE.Line(measurement, new THREE.LineDashedMaterial({ color: course.color||'#63d4bf', dashSize: .28, gapSize: .18, transparent: true, opacity: .88 }));
           measureLine.computeLineDistances(); routeGroup.add(measureLine);
           const mid = curve.getPoint(.5), label = createLabel(String(amount.toFixed(1)) + ' ' + s.unit, '#fff5c6', '#28433b');
           label.position.set(mid.x, mid.y + .62, mid.z); label.scale.set(1.1, .28, 1); routeGroup.add(label);
         }
       }
       if (s.showRoute && ordered.length) {
-        for(const item of groups[0]){const first=obstacleTraversal(s,ordered,item.index,s.length*(s.unit==='ft'?.3048:1),s.width*(s.unit==='ft'?.3048:1),null,groups[1]?.[0].o),inside=new THREE.CatmullRomCurve3(first.points),line=new THREE.Mesh(new THREE.TubeGeometry(inside,Math.max(8,first.points.length*2),.035,6,false),mat(item.variantIndex>0?'#397fd0':s.path||'#f07851',.48));line.material.depthTest=false;line.renderOrder=5;routeGroup.add(line)}
+        const first=obstacleTraversal(routeState,ordered,0,s.length*(s.unit==='ft'?.3048:1),s.width*(s.unit==='ft'?.3048:1),null,ordered[1]),inside=new THREE.CatmullRomCurve3(first.points),line=new THREE.Mesh(new THREE.TubeGeometry(inside,Math.max(8,first.points.length*2),.035,6,false),mat(course.color||s.path||'#f07851',.48));line.material.depthTest=false;line.renderOrder=5;routeGroup.add(line)
       }
+    }
     }
   }
   function update(s) {
