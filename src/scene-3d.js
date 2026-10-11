@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { obstacleFootprint, obstacleEntrySide } from './obstacle-icons.js?v=agility-purple-multi-20261011';
+import { obstacleFootprint, obstacleEntrySide } from './obstacle-icons.js?v=agility-independent-courses-20261011';
 
 const obstacleColors = {
   jump: '#f2aa42', spread: '#f2aa42', wall: '#ed7863', longJump: '#ef9c4e',
@@ -134,7 +134,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
       hoop.position.copy(point); hoop.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent); group.add(hoop);
     }
   }
-  function makeObstacle(obstacle) {
+  function makeObstacle(obstacle,courseState=getState()) {
     const g = new THREE.Group(); g.userData.obstacleId = obstacle.id;
     const orange = '#f1a943', teal = '#16a6a9', charcoal = '#273630';
     switch (obstacle.type) {
@@ -202,18 +202,18 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
       default: addBox(g, obstacleColors[obstacle.type] || orange, 0, .4, 0, .8, .8, .8);
     }
     g.rotation.y = -(Number(obstacle.rotation) || 0) * Math.PI / 180;
-    const pos = createObstacleBadge(g, obstacle);
+    const pos = createObstacleBadge(g, obstacle,courseState);
     g.userData.badge = pos;
-    g.userData.badgeSignature = obstacleBadgeSignature(obstacle);
+    g.userData.badgeSignature = obstacleBadgeSignature(obstacle,courseState);
     g.userData.geometrySignature = `${obstacle.type}|${obstacle.length || ''}|${obstacle.bend || ''}|${obstacle.height || ''}|${obstacle.poleCount || ''}`;
     g.traverse(obj => { if (obj.isMesh) { obj.userData.obstacleId = obstacle.id; obj.castShadow = true; } });
     return g;
   }
   function obstacleVisitCount(obstacle,s=getState()){const route=Array.isArray(s.route)?s.route:[],count=route.filter(visit=>(typeof visit==='string'?visit:visit?.obstacleId)===obstacle.id).length;return Math.max(1,count)}
-  function obstacleBadgeSignature(obstacle){const route=Array.isArray(getState().route)?getState().route:[],numbers=route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id).map(item=>Number.isInteger(item.visit?.n)?item.visit.n:obstacle.n);return `${obstacle.n}|${obstacle.label||''}|${numbers.join(',')}`}
-  function createObstacleBadge(group, obstacle) {
-    const badges=new THREE.Group(),s=getState(),route=Array.isArray(s.route)?s.route:[],visits=route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id),items=visits.length?visits:[{visit:null,index:null}],height=Number(obstacle.height)||(obstacle.type==='dogWalk'?1.2:1.7),depth=obstacleFootprint(obstacle).depth;
-    for(let i=0;i<items.length;i++){const {visit,index}=items[i],number=Number.isInteger(visit?.n)?visit.n:obstacle.n,badge=createLabel(`${number}${obstacle.label?` · ${obstacle.label}`:''}`, '#fff8e8', '#234238');badge.userData.obstacleId=obstacle.id;badge.userData.visitIndex=index;badge.userData.numberBadge=true;badge.position.x=(i-(items.length-1)/2)*.52;badge.position.z=obstacleEntrySide(obstacle,s,index)*(visit?.reverse===true?-1:1)*(depth/2+1.05);badge.scale.set(1.45,.34,1);badges.add(badge)}
+  function obstacleBadgeSignature(obstacle,s=getState()){const route=Array.isArray(s.route)?s.route:[],numbers=route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id).map(item=>Number.isInteger(item.visit?.n)?item.visit.n:obstacle.n);return `${obstacle.n}|${obstacle.label||''}|${numbers.join(',')}`}
+  function createObstacleBadge(group, obstacle, s=getState()) {
+    const badges=new THREE.Group(),route=Array.isArray(s.route)?s.route:[],visits=route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id),items=visits.length?visits:[{visit:null,index:null}],height=Number(obstacle.height)||(obstacle.type==='dogWalk'?1.2:1.7),depth=obstacleFootprint(obstacle).depth;
+    for(let i=0;i<items.length;i++){const {visit,index}=items[i],number=Number.isInteger(visit?.n)?visit.n:obstacle.n,badge=createLabel(`${number}${obstacle.label?` · ${obstacle.label}`:''}`, '#fff8e8', '#234238');badge.userData.obstacleId=obstacle.id;badge.userData.visitIndex=index;badge.userData.numberBadge=true;badge.userData.courseId=s.activeCourseId;badge.position.x=(i-(items.length-1)/2)*.52;badge.position.z=obstacleEntrySide(obstacle,s,index)*(visit?.reverse===true?-1:1)*(depth/2+1.05);badge.scale.set(1.45,.34,1);badges.add(badge)}
     badges.position.y=obstacle.type==='aFrame'?height+.42:obstacle.type==='dogWalk'?height+.42:1.3;group.add(badges);return badges;
   }
   function createLabel(text, foreground = '#f3f7ee', background = '#1b2b25') {
@@ -255,10 +255,10 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   }
   function buildRoute(s) {
     clearGroup(routeGroup);
-    const byId=new Map(s.obstacles.map(o=>[o.id,o])),courses=(Array.isArray(s.courses)&&s.courses.length?s.courses:[{id:s.activeCourseId||'main',route:s.route,color:s.path,routeBends:s.routeBends,visible:true}]).filter(course=>course.visible!==false);
+    const courses=(Array.isArray(s.courses)&&s.courses.length?s.courses:[{id:s.activeCourseId||'main',obstacles:s.obstacles,route:s.route,color:s.path,routeBends:s.routeBends,visible:true}]).filter(course=>course.visible!==false);
     for(const course of courses){
-      const routeState={...s,route:course.route||[],routeBends:course.routeBends||{},path:course.color||s.path},visits=Array.isArray(routeState.route)?routeState.route.map((visit,index)=>({visit,index,key:typeof visit==='string'?visit:visit?.obstacleId})).filter(item=>byId.has(item.key)):[];
-      const ordered=visits.length?visits.map(({visit,index,key})=>({...byId.get(key),n:Number.isInteger(visit?.n)?visit.n:byId.get(key).n,_reverse:visit?.reverse===true,_visitIndex:index,_visitKey:`${key}@${index}`})):course.automatic===false?[]:[...s.obstacles].sort((a,b)=>a.n-b.n);
+      const obstacles=Array.isArray(course.obstacles)?course.obstacles:s.obstacles,byId=new Map(obstacles.map(o=>[o.id,o])),routeState={...s,obstacles,activeCourseId:course.id,route:course.route||[],routeBends:course.routeBends||{},path:course.color||s.path},visits=Array.isArray(routeState.route)?routeState.route.map((visit,index)=>({visit,index,key:typeof visit==='string'?visit:visit?.obstacleId})).filter(item=>byId.has(item.key)):[];
+      const ordered=visits.length?visits.map(({visit,index,key})=>({...byId.get(key),n:Number.isInteger(visit?.n)?visit.n:byId.get(key).n,_reverse:visit?.reverse===true,_visitIndex:index,_visitKey:`${key}@${index}`})):course.automatic===false?[]:[...obstacles].sort((a,b)=>a.n-b.n);
       const links=ordered.slice(0,-1).map((a,i)=>({ai:i,bi:i+1,a,b:ordered[i+1],prev:ordered[i-1]||a,next:ordered[i+2]||ordered[i+1]}));
       if ((s.showRoute || s.showDistances) && ordered.length > 1) {
       for (const {ai,bi,a,b,prev,next} of links) {
@@ -312,18 +312,20 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     const signature = `${(Number(s.length) || 40) * unitScale}|${(Number(s.width) || 24) * unitScale}|${s.grid}|${s.gridSize}|${s.unit}`;
     if (floorGroup.userData.signature !== signature) buildFloor(s);
     const L = (Number(s.length) || 40) * unitScale, W = (Number(s.width) || 24) * unitScale;
-    const liveIds = new Set();
-    for (const obstacle of s.obstacles) {
+    const visibleCourses=(Array.isArray(s.courses)&&s.courses.length?s.courses:[{id:s.activeCourseId||'main',obstacles:s.obstacles,route:s.route,routeBends:s.routeBends,color:s.path,visible:true}]).filter(course=>course.visible!==false),liveIds = new Set();
+    for (const course of visibleCourses) for (const obstacle of course.obstacles||s.obstacles) {
+      const courseState={...s,activeCourseId:course.id,obstacles:course.obstacles||s.obstacles,route:course.route||[],routeBends:course.routeBends||{},path:course.color||s.path};
       liveIds.add(obstacle.id);
       let g = obstacleGroup.children.find(child => child.userData.obstacleId === obstacle.id);
       const geometrySignature = `${obstacle.type}|${obstacle.length || ''}|${obstacle.bend || ''}|${obstacle.height || ''}|${obstacle.poleCount || ''}`;
       if (!g || g.userData.geometrySignature !== geometrySignature) {
         if (g) { obstacleGroup.remove(g); disposeObject(g); }
-        g = makeObstacle(obstacle); obstacleGroup.add(g);
-      } else if (g.userData.badgeSignature !== obstacleBadgeSignature(obstacle)) {
+        g = makeObstacle(obstacle,courseState); obstacleGroup.add(g);
+      } else if (g.userData.badgeSignature !== obstacleBadgeSignature(obstacle,courseState)) {
         g.remove(g.userData.badge); g.userData.badge?.traverse?.(item=>{item.material?.map?.dispose?.();item.material?.dispose?.()});
-        g.userData.badge = createObstacleBadge(g, obstacle); g.userData.badgeSignature = obstacleBadgeSignature(obstacle);
+        g.userData.badge = createObstacleBadge(g, obstacle,courseState); g.userData.badgeSignature = obstacleBadgeSignature(obstacle,courseState);
       }
+      g.userData.courseId=course.id;g.traverse(obj=>{obj.userData.obstacleId=obstacle.id;obj.userData.courseId=course.id});
       g.userData.badge.visible = !!s.showNumbers;
       g.position.set((obstacle.x - .5) * L, .045, (obstacle.y - .5) * W);
       g.rotation.y = -(Number(obstacle.rotation) || 0) * Math.PI / 180;
@@ -348,7 +350,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   canvas.addEventListener('pointerdown', e => {
     ray(e);
     const intersections=caster.intersectObjects(obstacleGroup.children,true),badgeHit=intersections.find(h=>h.object.userData.numberBadge);
-    if(badgeHit&&getState().showNumbers){const id=badgeHit.object.userData.obstacleId;onSelect(id);onEditNumber?.(id,badgeHit.object.userData.visitIndex??null);e.preventDefault();return}
+    if(badgeHit&&getState().showNumbers){const id=badgeHit.object.userData.obstacleId,courseId=badgeHit.object.userData.courseId;onSelect(id,courseId);onEditNumber?.(id,badgeHit.object.userData.visitIndex??null);e.preventDefault();return}
     if (getState().tool === 'route') {
       caster.params.Line = { threshold: .18 };
       const hits = caster.intersectObjects(routeGroup.children, true).filter(h => h.object.userData.routeKey);
@@ -361,7 +363,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     const hits = intersections.filter(h => h.object.userData.obstacleId);
     if (hits.length) {
       const hit = hits[0], id = hit.object.userData.obstacleId;
-      onSelect(id);
+      onSelect(id,hit.object.userData.courseId);
       if(e.altKey){const obstacle=getState().obstacles.find(item=>item.id===id);action={type:'rotate',id,startX:e.clientX,initial:Number(obstacle?.rotation)||0};canvas.setPointerCapture(e.pointerId);e.preventDefault();return}
       const point = new THREE.Vector3(); caster.ray.intersectPlane(ground, point);
       action = { type: 'move', id, offset: obstacleGroup.children.find(g => g.userData.obstacleId === id).position.clone().sub(point), moved: false };
@@ -406,3 +408,4 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   const observer = new ResizeObserver(() => update(getState())); observer.observe(canvas.parentElement);
   return { update, renderer, dispose() { observer.disconnect(); clearGroup(obstacleGroup); clearGroup(routeGroup); clearGroup(floorGroup); renderer.dispose(); } };
 }
+
