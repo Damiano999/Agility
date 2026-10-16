@@ -343,7 +343,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     }
     for (const child of [...obstacleGroup.children]) if (!liveIds.has(child.userData.obstacleId)) { obstacleGroup.remove(child); disposeObject(child); }
     clearGroup(markerGroup);
-    if (s.showNumbers) for (const course of visibleCourses) for (const marker of course.markers || []) createLooseNumberMarker(marker, course.color || s.path, course.id, L, W);
+    if (s.showLooseNumbers) for (const course of visibleCourses) for (const marker of course.markers || []) createLooseNumberMarker(marker, course.color || s.path, course.id, L, W);
     buildRoute(s);
     camera.position.set(target.x + Math.sin(azimuth) * Math.cos(elevation) * distance, target.y + Math.sin(elevation) * distance, target.z + Math.cos(azimuth) * Math.cos(elevation) * distance);
     camera.lookAt(target);
@@ -363,7 +363,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   canvas.addEventListener('pointerdown', e => {
     ray(e);
     const intersections=caster.intersectObjects([obstacleGroup,markerGroup],true),markerHit=intersections.find(h=>h.object.userData.looseMarkerId);
-    if(markerHit&&getState().showNumbers){onEditMarker?.(markerHit.object.userData.looseMarkerId,markerHit.object.userData.courseId);e.preventDefault();return}
+    if(markerHit&&getState().showLooseNumbers){onEditMarker?.(markerHit.object.userData.looseMarkerId,markerHit.object.userData.courseId);e.preventDefault();return}
     const badgeHit=intersections.find(h=>h.object.userData.numberBadge);
     if(badgeHit&&getState().showNumbers){const id=badgeHit.object.userData.obstacleId,courseId=badgeHit.object.userData.courseId;onSelect(id,courseId);onEditNumber?.(id,badgeHit.object.userData.visitIndex??null);e.preventDefault();return}
     if (getState().tool === 'route') {
