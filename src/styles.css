@@ -81,3 +81,7 @@
 .tool-random-course{border-color:#8061a5;background:#38234f;color:var(--lime)}
 .tool-random-course:hover{border-color:#c4a1ff;background:#49345e;color:#fff}
 .tool-random-course svg{color:inherit}
+
+
+/* Keep desktop sidebars within the viewport and scroll their contents independently. */
+@media(min-width:851px){.app{display:flex;flex-direction:column;overflow:hidden}.workspace{flex:1;min-height:0;height:auto}.left,.right{height:100%;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#806998 #21182e}.left::-webkit-scrollbar,.right::-webkit-scrollbar{width:8px}.left::-webkit-scrollbar-track,.right::-webkit-scrollbar-track{background:#21182e}.left::-webkit-scrollbar-thumb,.right::-webkit-scrollbar-thumb{background:#806998;border-radius:8px;border:2px solid #21182e}.left::-webkit-scrollbar-thumb:hover,.right::-webkit-scrollbar-thumb:hover{background:#a88ac5}}
