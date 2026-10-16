@@ -77,3 +77,7 @@
 .tool-clear-course:hover{border-color:#b45f80;background:#482b43;color:#ffb5d4}
 .sidebar-info .sidebar-section-body{display:grid;gap:7px}
 .sidebar-info .tutorial-open{margin:0;min-height:34px}
+
+.tool-random-course{border-color:#8061a5;background:#38234f;color:var(--lime)}
+.tool-random-course:hover{border-color:#c4a1ff;background:#49345e;color:#fff}
+.tool-random-course svg{color:inherit}
