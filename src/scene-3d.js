@@ -258,7 +258,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     }
     const temp=new THREE.Object3D(),trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(.13,.22,1,6),mat('#62472f'),treePositions.length),
       pine=new THREE.InstancedMesh(new THREE.ConeGeometry(1,1.2,10),mat('#2c5c3d'),treePositions.length*5),
-      broadleaf=new THREE.InstancedMesh(new THREE.SphereGeometry(1,14,10),mat('#47764b'),treePositions.length*4);
+      broadleaf=new THREE.InstancedMesh(new THREE.SphereGeometry(1,14,10),mat('#47764b'),treePositions.length*5);
     let pineIndex=0,canopyIndex=0;
     treePositions.forEach(([x,z],i)=>{
       const height=4.4+random()*3.5,isBroadleaf=i%3===0;
@@ -266,15 +266,15 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
       trunks.setColorAt(i,new THREE.Color(isBroadleaf?'#705037':'#62472f'));
       const radius=1.35+random()*.8;
       if(isBroadleaf){
-        for(let cluster=0;cluster<4;cluster++){
-          const angle=cluster*Math.PI/2+random()*.5,spread=radius*.34,clusterSize=radius*(.48+random()*.18);
+        for(let cluster=0;cluster<5;cluster++){
+          const center=cluster===4,angle=cluster*Math.PI/2+random()*.5,spread=center?0:radius*.34,clusterSize=center?radius*.68:radius*(.48+random()*.18);
           temp.position.set(x+Math.cos(angle)*spread,-.4+height*.7+(random()-.5)*.5,z+Math.sin(angle)*spread);
           temp.scale.set(clusterSize,clusterSize*.82,clusterSize);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();broadleaf.setMatrixAt(canopyIndex,temp.matrix);
           broadleaf.setColorAt(canopyIndex,new THREE.Color(['#3b7547','#4d854c','#5b8b4e'][Math.floor(random()*3)]));canopyIndex++;
         }
       }else{
-        for(let layer=0;layer<3;layer++){
-          const layerHeight=height*(.4+layer*.105),size=radius*(1-layer*.115);
+        for(let layer=0;layer<5;layer++){
+          const layerHeight=height*(.34+layer*.1),size=radius*(1-layer*.105);
           temp.position.set(x,-.4+layerHeight,z);temp.scale.set(size,height*.34,size);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();pine.setMatrixAt(pineIndex,temp.matrix);
           pine.setColorAt(pineIndex,new THREE.Color(['#244d35','#306442','#3b7248'][Math.floor(random()*3)]));pineIndex++;
         }
