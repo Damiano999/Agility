@@ -314,13 +314,13 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   function createLooseNumberMarker(marker, color, courseId, L, W) {
     const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 128;
     const context = canvas.getContext('2d');
-    context.beginPath(); context.arc(64, 64, 52, 0, Math.PI * 2); context.fillStyle = '#fffdf4'; context.fill();
-    context.lineWidth = 8; context.strokeStyle = color || '#8b5cf6'; context.stroke();
-    context.fillStyle = '#342145'; context.font = '700 58px system-ui, sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(String(marker.n), 64, 66, 92);
+    context.beginPath(); context.arc(64, 64, 52, 0, Math.PI * 2); const variant=Number(marker.variant)===2; context.fillStyle = variant?'#fff0e8':'#fffdf4'; context.fill();
+    context.lineWidth = 8; context.strokeStyle = variant?'#e56d49':(color || '#8b5cf6'); context.stroke();
+    context.fillStyle = variant?'#7b2f1d':'#342145'; context.font = '700 58px system-ui, sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(String(marker.n), 64, 66, 92);
     const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false }));
     sprite.renderOrder = 4; sprite.position.set((marker.x - .5) * L, .68, (marker.y - .5) * W); sprite.scale.set(.72, .72, 1);
-    sprite.userData.looseMarkerId = marker.id; sprite.userData.courseId = courseId; markerGroup.add(sprite);
+    sprite.userData.looseMarkerId = marker.id; sprite.userData.courseId = courseId; sprite.userData.markerVariant = variant?2:1; markerGroup.add(sprite);
   }
   function update(s) {
     const unitScale = s.unit === 'ft' ? .3048 : 1;
@@ -347,7 +347,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     }
     for (const child of [...obstacleGroup.children]) if (!liveIds.has(child.userData.obstacleId)) { obstacleGroup.remove(child); disposeObject(child); }
     clearGroup(markerGroup);
-    if (s.showLooseNumbers) for (const course of visibleCourses) for (const marker of course.markers || []) createLooseNumberMarker(marker, course.color || s.path, course.id, L, W);
+    for (const course of visibleCourses) for (const marker of course.markers || []) if(Number(marker.variant)===2?s.showLooseNumbers2:s.showLooseNumbers) createLooseNumberMarker(marker, course.color || s.path, course.id, L, W);
     buildRoute(s);
     camera.position.set(target.x + Math.sin(azimuth) * Math.cos(elevation) * distance, target.y + Math.sin(elevation) * distance, target.z + Math.cos(azimuth) * Math.cos(elevation) * distance);
     camera.lookAt(target);
@@ -367,7 +367,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   canvas.addEventListener('pointerdown', e => {
     ray(e);
     const intersections=caster.intersectObjects([obstacleGroup,markerGroup],true),markerHit=intersections.find(h=>h.object.userData.looseMarkerId);
-    if(markerHit&&getState().showLooseNumbers){onEditMarker?.(markerHit.object.userData.looseMarkerId,markerHit.object.userData.courseId);e.preventDefault();return}
+    if(markerHit){onEditMarker?.(markerHit.object.userData.looseMarkerId,markerHit.object.userData.courseId);e.preventDefault();return}
     const badgeHit=intersections.find(h=>h.object.userData.numberBadge);
     if(badgeHit&&getState().showNumbers){const id=badgeHit.object.userData.obstacleId,courseId=badgeHit.object.userData.courseId;onSelect(id,courseId);onEditNumber?.(id,badgeHit.object.userData.visitIndex??null);e.preventDefault();return}
     if (getState().tool === 'route') {
