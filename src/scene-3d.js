@@ -36,6 +36,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   const floorGroup = new THREE.Group(), obstacleGroup = new THREE.Group(), routeGroup = new THREE.Group(), markerGroup = new THREE.Group();
   scene.add(floorGroup, routeGroup, obstacleGroup, markerGroup);
   const forestGroup = new THREE.Group(); scene.add(forestGroup);
+  let forestAnimals=[],animalAnimationTimer=null;
 
   function addBox(group, color, x, y, z, w, h, d, options = {}) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, options.roughness ?? .72, options.metalness ?? 0));
@@ -240,11 +241,11 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     ground.rotation.x=-Math.PI/2;ground.position.y=-.405;ground.receiveShadow=true;forestGroup.add(ground);
     let seed=Math.floor(L*1301+W*7919)>>>0;
     const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
-    const treePositions=[];
+    const seatLength=Math.min(18,Math.max(8,W*.72)),treePositions=[];
     for(const margin of [7,16]){
       const spacing=8,countX=Math.max(2,Math.ceil(L/spacing)),countZ=Math.max(2,Math.ceil(W/spacing));
       for(let i=0;i<countX;i++){const x=-L/2+(i+.5)*L/countX+(random()-.5)*2;treePositions.push([x,W/2+margin+(random()-.5)*2],[x,-W/2-margin+(random()-.5)*2])}
-      for(let i=0;i<countZ;i++){const z=-W/2+(i+.5)*W/countZ+(random()-.5)*2;treePositions.push([L/2+margin+(random()-.5)*2,z],[-L/2-margin+(random()-.5)*2,z])}
+      for(let i=0;i<countZ;i++){const z=-W/2+(i+.5)*W/countZ+(random()-.5)*2;if(!(margin===7&&Math.abs(z)<seatLength/2+2))treePositions.push([L/2+margin+(random()-.5)*2,z]);treePositions.push([-L/2-margin+(random()-.5)*2,z])}
     }
     const temp=new THREE.Object3D(),trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(.13,.22,1,6),mat('#62472f'),treePositions.length),
       pine=new THREE.InstancedMesh(new THREE.ConeGeometry(1,1.25,7),mat('#2c5c3d'),treePositions.length*3),
@@ -303,6 +304,54 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
       temp.position.set(cx,-.31,cz);temp.scale.set(flowerSize*.55,flowerSize*.5,flowerSize*.55);temp.rotation.set(0,0,0);temp.updateMatrix();centers.setMatrixAt(i,temp.matrix);
     }
     petals.instanceMatrix.needsUpdate=true;centers.instanceMatrix.needsUpdate=true;forestGroup.add(petals,centers);
+    const seatMat='#8a5b39',supportMat='#64452f';
+    for(let row=0;row<3;row++){
+      const x=L/2+4.6+row*1.05,level=.38+row*.34;
+      addBox(forestGroup,supportMat,x,.08+row*.23,0,.78,.28+row*.22,seatLength,{roughness:.9});
+      addBox(forestGroup,seatMat,x-.12,level,0,.42,.14,seatLength,{roughness:.8});
+    }
+    for(const end of [-1,1]){
+      addBox(forestGroup,supportMat,L/2+5.6,.82,end*(seatLength/2+.08),2.7,.14,.16);
+      for(let row=0;row<3;row++)addBox(forestGroup,supportMat,L/2+4.6+row*1.05,.4+row*.34,end*(seatLength/2-.12),.12,.5,.12);
+    }
+    const rail=mat('#b58a5d');
+    const backRail=new THREE.Mesh(new THREE.BoxGeometry(.12,.12,seatLength),rail);backRail.position.set(L/2+7,1.55,0);forestGroup.add(backRail);
+    forestAnimals=[];
+    const sphereGeometry=new THREE.SphereGeometry(1,10,8),legGeometry=new THREE.CylinderGeometry(.045,.06,.4,6),earGeometry=new THREE.ConeGeometry(.1,.22,5);
+    const addPart=(parent,geometry,color,position,scale)=>{
+      const mesh=new THREE.Mesh(geometry,mat(color,.86));mesh.position.set(...position);mesh.scale.set(...scale);mesh.castShadow=false;parent.add(mesh);return mesh;
+    };
+    for(let dog=0;dog<3;dog++){
+      const root=new THREE.Group(),coat=['#c58b52','#51453f','#e8dfcf'][dog],dark=['#493322','#292522','#796e62'][dog],legs=[];
+      addPart(root,sphereGeometry,coat,[0,.58,0],[.5,.25,.27]);
+      addPart(root,sphereGeometry,coat,[.39,.69,0],[.23,.23,.2]);
+      addPart(root,sphereGeometry,dark,[.57,.61,0],[.15,.1,.13]);
+      for(const side of [-1,1])addPart(root,earGeometry,dark,[.32,.88,side*.13],[.75,1,.68]);
+      const tail=addPart(root,legGeometry,coat,[-.5,.72,0],[.6,1,.6]);tail.rotation.z=-1.0;
+      for(const x of [-.29,.29])for(const z of [-.16,.16]){
+        const pivot=new THREE.Group();pivot.position.set(x,.39,z);
+        const leg=addPart(pivot,legGeometry,dark,[0,-.19,0],[.9,1,.9]);root.add(pivot);legs.push(pivot);
+      }
+      root.userData.walk={legs,phase:dog*.34,speed:.11+dog*.012};
+      forestGroup.add(root);forestAnimals.push(root);
+    }
+    if(!animalAnimationTimer)animalAnimationTimer=window.setInterval(()=>{
+      if(document.visibilityState==='hidden'||!canvas.isConnected||!canvas.clientWidth||getState().view!=='3d')return;
+      const now=performance.now()*.001,margin=3.2,hx=L/2+margin,hz=W/2+margin,perimeter=4*(hx+hz);
+      for(const animal of forestAnimals){
+        const walk=animal.userData.walk;if(!walk)continue;
+        const distance=((now*walk.speed+walk.phase)*perimeter)%perimeter,segments=[2*hx,2*hz,2*hx,2*hz];let d=distance,segment=0;
+        while(segment<3&&d>segments[segment]){d-=segments[segment];segment++}
+        const t=d/segments[segment];let x,z,yaw;
+        if(segment===0){x=-hx+d;z=-hz;yaw=0}
+        else if(segment===1){x=hx;z=-hz+d;yaw=-Math.PI/2}
+        else if(segment===2){x=hx-d;z=hz;yaw=Math.PI}
+        else{x=-hx;z=hz-d;yaw=Math.PI/2}
+        animal.position.set(x,-.4+Math.abs(Math.sin(now*6+walk.phase))*.025,z);animal.rotation.y=yaw;
+        walk.legs.forEach((leg,index)=>{leg.rotation.z=Math.sin(now*7+walk.phase+(index%2)*Math.PI)*.32});
+      }
+      renderer.render(scene,camera);
+    },80);
     forestGroup.userData.signature=`${L}|${W}`;
   }
   function buildFloor(s) {
@@ -514,6 +563,6 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('wheel', e => { distance = Math.max(10, Math.min(130, distance * (e.deltaY > 0 ? 1.08 : .92))); update(getState()); clearTimeout(wheelTimeout); wheelTimeout = setTimeout(onDone, 400); e.preventDefault(); }, { passive: false });
   const observer = new ResizeObserver(() => update(getState())); observer.observe(canvas.parentElement);
-  return { update, renderer, dispose() { observer.disconnect(); clearGroup(obstacleGroup); clearGroup(routeGroup); clearGroup(floorGroup); clearGroup(forestGroup); renderer.dispose(); } };
+  return { update, renderer, dispose() { observer.disconnect(); clearGroup(obstacleGroup); clearGroup(routeGroup); clearGroup(floorGroup); clearGroup(forestGroup); if(animalAnimationTimer)clearInterval(animalAnimationTimer); forestAnimals=[]; renderer.dispose(); } };
 }
 
