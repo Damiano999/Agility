@@ -237,6 +237,8 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   function matCacheHas(material) { return [...matCache.values()].includes(material); }
   function buildForest(s,L,W) {
     clearGroup(forestGroup);
+    let seed=Math.floor(L*1301+W*7919)>>>0;
+    const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
     const skyRadius=Math.hypot(L,W)*2.6+100,skyGeometry=new THREE.SphereGeometry(skyRadius,48,32),positions=skyGeometry.attributes.position,skyColors=[];
     const horizon=new THREE.Color('#a9d0e5'),zenith=new THREE.Color('#4383bd'),earth=new THREE.Color('#294d36');
     for(let i=0;i<positions.count;i++){const t=Math.max(-1,Math.min(1,positions.getY(i)/skyRadius));let color;if(t>=.04)color=horizon.clone().lerp(zenith,Math.min(1,(t-.04)/.96));else if(t>=-.08)color=earth.clone().lerp(horizon,(t+.08)/.12);else color=earth.clone().multiplyScalar(.82);skyColors.push(color.r,color.g,color.b)}
@@ -267,8 +269,6 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
       forestGroup.add(duck);pondDucks.push(duck);
     }
 
-    let seed=Math.floor(L*1301+W*7919)>>>0;
-    const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
     const seatLength=Math.min(18,Math.max(8,W*.72)),treePositions=[];
     for(const margin of [7,16]){
       const spacing=8,countX=Math.max(2,Math.ceil(L/spacing)),countZ=Math.max(2,Math.ceil(W/spacing));
