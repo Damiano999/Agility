@@ -85,3 +85,5 @@
 
 /* Keep desktop sidebars within the viewport and scroll their contents independently. */
 @media(min-width:851px){.app{display:flex;flex-direction:column;overflow:hidden}.workspace{flex:1;min-height:0;height:auto}.left,.right{height:100%;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#806998 #21182e}.left::-webkit-scrollbar,.right::-webkit-scrollbar{width:8px}.left::-webkit-scrollbar-track,.right::-webkit-scrollbar-track{background:#21182e}.left::-webkit-scrollbar-thumb,.right::-webkit-scrollbar-thumb{background:#806998;border-radius:8px;border:2px solid #21182e}.left::-webkit-scrollbar-thumb:hover,.right::-webkit-scrollbar-thumb:hover{background:#a88ac5}}
+
+.course-manager .course-name-input{display:block;flex:none;width:100%;min-width:0;height:42px;padding:9px 11px;border:1px solid #a98bc7;border-radius:8px;background:#241a31;color:#fff;font:600 14px/1.3 'DM Sans',sans-serif;outline:none;box-shadow:0 0 0 2px #8b5cf633}.course-manager .course-name-input:focus{border-color:#c4a1ff;box-shadow:0 0 0 3px #8b5cf655}
