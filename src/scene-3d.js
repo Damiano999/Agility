@@ -332,15 +332,15 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
         const pivot=new THREE.Group();pivot.position.set(x,.39,z);
         const leg=addPart(pivot,legGeometry,dark,[0,-.19,0],[.9,1,.9]);root.add(pivot);legs.push(pivot);
       }
-      root.userData.walk={legs,phase:dog*.34,speed:.11+dog*.012};
+      root.userData.walk={legs,phase:dog*.34,speed:1.1+dog*.12};
       forestGroup.add(root);forestAnimals.push(root);
     }
     if(!animalAnimationTimer)animalAnimationTimer=window.setInterval(()=>{
       if(document.visibilityState==='hidden'||!canvas.isConnected||!canvas.clientWidth||getState().view!=='3d')return;
-      const now=performance.now()*.001,margin=3.2,hx=L/2+margin,hz=W/2+margin,perimeter=4*(hx+hz);
+      const now=performance.now()*.001,current=getState(),unitScale=current.unit==='ft'?.3048:1,fieldLength=(Number(current.length)||40)*unitScale,fieldWidth=(Number(current.width)||24)*unitScale,margin=3.2,hx=fieldLength/2+margin,hz=fieldWidth/2+margin,perimeter=4*(hx+hz);
       for(const animal of forestAnimals){
         const walk=animal.userData.walk;if(!walk)continue;
-        const distance=((now*walk.speed+walk.phase)*perimeter)%perimeter,segments=[2*hx,2*hz,2*hx,2*hz];let d=distance,segment=0;
+        const distance=(now*walk.speed+walk.phase*perimeter)%perimeter,segments=[2*hx,2*hz,2*hx,2*hz];let d=distance,segment=0;
         while(segment<3&&d>segments[segment]){d-=segments[segment];segment++}
         const t=d/segments[segment];let x,z,yaw;
         if(segment===0){x=-hx+d;z=-hz;yaw=0}
