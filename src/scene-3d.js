@@ -36,7 +36,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   const floorGroup = new THREE.Group(), obstacleGroup = new THREE.Group(), routeGroup = new THREE.Group(), markerGroup = new THREE.Group();
   scene.add(floorGroup, routeGroup, obstacleGroup, markerGroup);
   const forestGroup = new THREE.Group(); scene.add(forestGroup);
-  let forestAnimals=[],animalAnimationTimer=null;
+  let forestAnimals=[],pondDucks=[],animalAnimationTimer=null;
 
   function addBox(group, color, x, y, z, w, h, d, options = {}) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, options.roughness ?? .72, options.metalness ?? 0));
@@ -248,6 +248,25 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     sunGlow.position.copy(sunPosition);sunGlow.renderOrder=-95;forestGroup.add(sunGlow);
     const ground=new THREE.Mesh(new THREE.PlaneGeometry(L+64,W+64),mat('#294d36',.98));
     ground.rotation.x=-Math.PI/2;ground.position.y=-.405;ground.receiveShadow=true;forestGroup.add(ground);
+    const pondX=L/2+11.5,pondZ=W/2+11.5,pondBank=new THREE.Mesh(new THREE.CircleGeometry(1,48),mat('#756849',.95));
+    pondBank.rotation.x=-Math.PI/2;pondBank.position.set(pondX,-.382,pondZ);pondBank.scale.set(4.8,3.25,1);forestGroup.add(pondBank);
+    const water=new THREE.Mesh(new THREE.CircleGeometry(1,48),new THREE.MeshPhysicalMaterial({color:'#438da0',roughness:.2,metalness:.12,clearcoat:.8,clearcoatRoughness:.16,transparent:true,opacity:.94}));
+    water.rotation.x=-Math.PI/2;water.position.set(pondX,-.355,pondZ);water.scale.set(4.05,2.55,1);water.renderOrder=-2;forestGroup.add(water);
+    const shoreRocks=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,1),mat('#817864',.94),18),rockTemp=new THREE.Object3D();
+    for(let i=0;i<18;i++){const angle=i/18*Math.PI*2,radiusX=4.35+(random()-.5)*.35,radiusZ=2.8+(random()-.5)*.3,size=.18+random()*.28;rockTemp.position.set(pondX+Math.cos(angle)*radiusX,-.31+size*.25,pondZ+Math.sin(angle)*radiusZ);rockTemp.scale.set(size*1.2,size*.55,size);rockTemp.rotation.set(random(),random()*Math.PI,random());rockTemp.updateMatrix();shoreRocks.setMatrixAt(i,rockTemp.matrix);shoreRocks.setColorAt(i,new THREE.Color(i%2?'#817864':'#9a8c70'))}
+    shoreRocks.instanceMatrix.needsUpdate=true;forestGroup.add(shoreRocks);
+    pondDucks=[];
+    const duckBody=new THREE.SphereGeometry(1,12,9),duckBill=new THREE.ConeGeometry(.08,.23,6);
+    for(let i=0;i<3;i++){
+      const duck=new THREE.Group(),body=new THREE.Mesh(duckBody,mat('#d7d2c3',.48)),wing=new THREE.Mesh(duckBody,mat(i===0?'#4e745d':'#82674b',.55)),head=new THREE.Mesh(duckBody,mat(i===0?'#237456':'#9b764d',.48)),bill=new THREE.Mesh(duckBill,mat('#e6a443',.48));
+      body.position.set(0,.02,0);body.scale.set(.42,.2,.25);wing.position.set(-.04,.13,.19);wing.scale.set(.27,.1,.12);head.position.set(.27,.19,0);head.scale.set(.16,.17,.15);bill.rotation.z=-Math.PI/2;bill.position.set(.43,.16,0);bill.scale.set(.75,.65,.7);
+      for(const side of [-1,1]){const eye=new THREE.Mesh(new THREE.SphereGeometry(.025,8,6),mat('#171b19'));eye.position.set(.31,.24,side*.12);duck.add(eye)}
+      duck.add(body,wing,head,bill);duck.scale.setScalar(.72+random()*.18);
+      const homeX=pondX+(i-1)*.75,homeZ=pondZ+(random()-.5)*.8;
+      duck.userData.swim={phase:random()*Math.PI*2,homeX,homeZ,speed:.4+random()*.35};duck.position.set(homeX,-.34,homeZ);duck.rotation.y=random()*Math.PI*2;
+      forestGroup.add(duck);pondDucks.push(duck);
+    }
+
     let seed=Math.floor(L*1301+W*7919)>>>0;
     const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
     const seatLength=Math.min(18,Math.max(8,W*.72)),treePositions=[];
@@ -383,6 +402,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     if(!animalAnimationTimer)animalAnimationTimer=window.setInterval(()=>{
       if(document.visibilityState==='hidden'||!canvas.isConnected||!canvas.clientWidth||getState().view!=='3d')return;
       const now=performance.now()*.001;
+      for(const duck of pondDucks){const swim=duck.userData.swim;if(!swim)continue;duck.position.set(swim.homeX+Math.sin(now*swim.speed+swim.phase)*.42,-.34+Math.sin(now*2+swim.phase)*.025,swim.homeZ+Math.cos(now*swim.speed*.7+swim.phase)*.24);duck.rotation.y=Math.atan2(Math.cos(now*swim.speed+swim.phase),Math.sin(now*swim.speed+swim.phase))}
       for(const animal of forestAnimals){
         const walk=animal.userData.walk;if(!walk)continue;
         const distance=(now*walk.speed+walk.phase*walk.totalLength)%walk.totalLength;let d=distance,segment=0;
@@ -604,6 +624,6 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('wheel', e => { distance = Math.max(10, Math.min(130, distance * (e.deltaY > 0 ? 1.08 : .92))); update(getState()); clearTimeout(wheelTimeout); wheelTimeout = setTimeout(onDone, 400); e.preventDefault(); }, { passive: false });
   const observer = new ResizeObserver(() => update(getState())); observer.observe(canvas.parentElement);
-  return { update, renderer, dispose() { observer.disconnect(); clearGroup(obstacleGroup); clearGroup(routeGroup); clearGroup(floorGroup); clearGroup(forestGroup); if(animalAnimationTimer)clearInterval(animalAnimationTimer); forestAnimals=[]; renderer.dispose(); } };
+  return { update, renderer, dispose() { observer.disconnect(); clearGroup(obstacleGroup); clearGroup(routeGroup); clearGroup(floorGroup); clearGroup(forestGroup); if(animalAnimationTimer)clearInterval(animalAnimationTimer); forestAnimals=[]; pondDucks=[]; renderer.dispose(); } };
 }
 
