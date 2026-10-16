@@ -43,3 +43,10 @@
 .course-color{flex:0 0 31px;width:31px!important;height:24px!important}
 .course-clear,.course-remove{width:100%!important;min-width:0;height:30px;white-space:normal;line-height:1.15;padding:2px 5px;font-size:10px}
 @media(max-width:850px){.course-row{padding:10px}.course-actions{gap:7px}}
+
+/* Prevent course actions from colliding in the narrow sidebar */
+.course-manager .course-row .course-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;align-items:stretch}
+.course-manager .course-row .course-actions>.course-visible,.course-manager .course-row .course-actions>.course-color-option,.course-manager .course-row .course-actions>.course-clear,.course-manager .course-row .course-actions>.course-remove{grid-column:1;box-sizing:border-box;width:100%;min-width:0;margin:0}
+.course-manager .course-row .course-actions>.course-visible,.course-manager .course-row .course-actions>.course-color-option{height:32px}
+.course-manager .course-row .course-actions>.course-clear{display:flex;align-items:center;justify-content:center;height:30px;padding:0 8px;font-size:10px;line-height:1.2;white-space:normal}
+.course-manager .course-row .course-actions>.course-remove{display:flex;align-items:center;justify-content:center;height:27px;padding:0 8px;font-size:9px;line-height:1.1;font-weight:600;white-space:normal}
