@@ -26,6 +26,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -40; sun.shadow.camera.right = 40; sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40; scene.add(sun);
   const fill = new THREE.DirectionalLight('#8ce1dc', 1.0); fill.position.set(18, 12, -16); scene.add(fill);
   const matCache = new Map();
+  let routeBuildSignature = '', markerBuildSignature = '';
   const mat = (color, roughness = .72, metalness = 0) => {
     const key = `${color}-${roughness}-${metalness}`;
     if (!matCache.has(key)) matCache.set(key, new THREE.MeshStandardMaterial({ color, roughness, metalness }));
@@ -346,9 +347,10 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
       g.rotation.y = -(Number(obstacle.rotation) || 0) * Math.PI / 180;
     }
     for (const child of [...obstacleGroup.children]) if (!liveIds.has(child.userData.obstacleId)) { obstacleGroup.remove(child); disposeObject(child); }
-    clearGroup(markerGroup);
-    for (const course of visibleCourses) for (const marker of course.markers || []) if(Number(marker.variant)===2?s.showLooseNumbers2:s.showLooseNumbers) createLooseNumberMarker(marker, course.color || s.path, course.id, L, W);
-    buildRoute(s);
+    const markerSignature=JSON.stringify({L,W,showLooseNumbers:s.showLooseNumbers,showLooseNumbers2:s.showLooseNumbers2,courses:visibleCourses.map(course=>({id:course.id,color:course.color,markers:(course.markers||[]).filter(marker=>Number(marker.variant)===2?s.showLooseNumbers2:s.showLooseNumbers).map(marker=>[marker.id,marker.x,marker.y,marker.n,marker.variant])}))});
+    if(markerSignature!==markerBuildSignature){clearGroup(markerGroup);for(const course of visibleCourses)for(const marker of course.markers||[])if(Number(marker.variant)===2?s.showLooseNumbers2:s.showLooseNumbers)createLooseNumberMarker(marker,course.color||s.path,course.id,L,W);markerBuildSignature=markerSignature}
+    const routeSignature=JSON.stringify({activeCourseId:s.activeCourseId,unit:s.unit,length:s.length,width:s.width,showRoute:s.showRoute,showDistances:s.showDistances,courses:visibleCourses.map(course=>({id:course.id,color:course.color,automatic:course.automatic,routeBends:course.routeBends||{},route:(course.route||[]).map(visit=>typeof visit==='string'?visit:[visit?.obstacleId,visit?.n,visit?.reverse]),obstacles:(course.obstacles||s.obstacles||[]).map(obstacle=>[obstacle.id,obstacle.type,obstacle.x,obstacle.y,obstacle.n,obstacle.rotation,obstacle.length,obstacle.bend,obstacle.height,obstacle.poleCount])}))});
+    if(routeSignature!==routeBuildSignature){buildRoute(s);routeBuildSignature=routeSignature}
     camera.position.set(target.x + Math.sin(azimuth) * Math.cos(elevation) * distance, target.y + Math.sin(elevation) * distance, target.z + Math.cos(azimuth) * Math.cos(elevation) * distance);
     camera.lookAt(target);
     const rect = canvas.getBoundingClientRect();
