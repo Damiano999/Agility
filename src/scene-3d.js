@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { obstacleFootprint, obstacleEntrySide } from './obstacle-icons.js?v=agility-independent-courses-20261011';
+import { obstacleFootprint, obstacleEntrySide } from './obstacle-icons.js?v=agility-number-drag-20261016';
 
 const obstacleColors = {
   jump: '#f2aa42', spread: '#f2aa42', wall: '#ed7863', longJump: '#ef9c4e',
@@ -210,7 +210,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     return g;
   }
   function obstacleVisitCount(obstacle,s=getState()){const route=Array.isArray(s.route)?s.route:[],count=route.filter(visit=>(typeof visit==='string'?visit:visit?.obstacleId)===obstacle.id).length;return Math.max(1,count)}
-  function obstacleBadgeSignature(obstacle,s=getState()){const route=Array.isArray(s.route)?s.route:[],numbers=route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id).map(item=>Number.isInteger(item.visit?.n)?item.visit.n:obstacle.n);return `${obstacle.n}|${obstacle.label||''}|${numbers.join(',')}`}
+  function obstacleBadgeSignature(obstacle,s=getState()){const route=Array.isArray(s.route)?s.route:[],badges=route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id).map(item=>[Number.isInteger(item.visit?.n)?item.visit.n:obstacle.n,item.visit?.numberPosition||'',item.visit?.numberOffset?.x||0,item.visit?.numberOffset?.y||0]);return `${obstacle.n}|${obstacle.label||''}|${JSON.stringify(badges)}`}
   function createObstacleBadge(group, obstacle, s=getState()) {
     const badges=new THREE.Group(),route=Array.isArray(s.route)?s.route:[],visits=route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id),items=visits.length?visits:[{visit:null,index:null}],height=Number(obstacle.height)||(obstacle.type==='dogWalk'?1.2:1.7),depth=obstacleFootprint(obstacle).depth;
     for(let i=0;i<items.length;i++){const {visit,index}=items[i],number=Number.isInteger(visit?.n)?visit.n:obstacle.n,badge=createLabel(`${number}${obstacle.label?` · ${obstacle.label}`:''}`, '#fff8e8', '#234238');badge.userData.obstacleId=obstacle.id;badge.userData.visitIndex=index;badge.userData.numberBadge=true;badge.userData.courseId=s.activeCourseId;const spread=(i-(items.length-1)/2)*.52,offset=depth/2+1.05,vertical=visit?.numberPosition,rotation=-(Number(obstacle.rotation)||0)*Math.PI/180,verticalSign=vertical==='top'?-1:1,numberOffset=visit?.numberOffset,unitScale=s.unit==='ft'?.3048:1,worldDx=(Number(numberOffset?.x)||0)*s.length*unitScale,worldDz=(Number(numberOffset?.y)||0)*s.width*unitScale,localDx=Math.cos(-rotation)*worldDx+Math.sin(-rotation)*worldDz,localDz=-Math.sin(-rotation)*worldDx+Math.cos(-rotation)*worldDz;badge.position.x=spread+(vertical?-Math.sin(rotation)*verticalSign*offset:0)+localDx;badge.position.z=(vertical?Math.cos(rotation)*verticalSign*offset:obstacleEntrySide(obstacle,s,index)*(visit?.reverse===true?-1:1)*offset)+localDz;badge.scale.set(1.45,.34,1);badges.add(badge)}
