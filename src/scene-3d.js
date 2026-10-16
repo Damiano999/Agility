@@ -246,29 +246,63 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
       for(let i=0;i<countX;i++){const x=-L/2+(i+.5)*L/countX+(random()-.5)*2;treePositions.push([x,W/2+margin+(random()-.5)*2],[x,-W/2-margin+(random()-.5)*2])}
       for(let i=0;i<countZ;i++){const z=-W/2+(i+.5)*W/countZ+(random()-.5)*2;treePositions.push([L/2+margin+(random()-.5)*2,z],[-L/2-margin+(random()-.5)*2,z])}
     }
-    const trunkGeo=new THREE.CylinderGeometry(.13,.22,1,6),leafGeo=new THREE.ConeGeometry(1,1.25,7);
-    const trunks=new THREE.InstancedMesh(trunkGeo,mat('#62472f'),treePositions.length);
-    const leaves=new THREE.InstancedMesh(leafGeo,mat('#2c5c3d'),treePositions.length*3);
-    const temp=new THREE.Object3D();let leafIndex=0;
+    const temp=new THREE.Object3D(),trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(.13,.22,1,6),mat('#62472f'),treePositions.length),
+      pine=new THREE.InstancedMesh(new THREE.ConeGeometry(1,1.25,7),mat('#2c5c3d'),treePositions.length*3),
+      broadleaf=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,1),mat('#47764b'),treePositions.length*3);
+    let pineIndex=0,canopyIndex=0;
     treePositions.forEach(([x,z],i)=>{
-      const height=4.4+random()*3.5;
+      const height=4.4+random()*3.5,isBroadleaf=i%3===0;
       temp.position.set(x,-.4+height/2,z);temp.scale.set(1,height,1);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();trunks.setMatrixAt(i,temp.matrix);
+      trunks.setColorAt(i,new THREE.Color(isBroadleaf?'#705037':'#62472f'));
       const radius=1.25+random()*.7;
-      for(let layer=0;layer<3;layer++){
-        const layerHeight=height*(.52+layer*.14),size=radius*(1-layer*.2);
-        temp.position.set(x,-.4+layerHeight,z);temp.scale.set(size,height*.48,size);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();leaves.setMatrixAt(leafIndex,temp.matrix);
-        leaves.setColorAt(leafIndex,new THREE.Color(['#244d35','#306442','#3b7248'][Math.floor(random()*3)]));leafIndex++;
+      if(isBroadleaf){
+        for(let cluster=0;cluster<3;cluster++){
+          const angle=cluster*Math.PI*2/3+random()*.5,spread=radius*.42,clusterSize=radius*(.56+random()*.16);
+          temp.position.set(x+Math.cos(angle)*spread,-.4+height*.7+(random()-.5)*.5,z+Math.sin(angle)*spread);
+          temp.scale.set(clusterSize,clusterSize*.82,clusterSize);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();broadleaf.setMatrixAt(canopyIndex,temp.matrix);
+          broadleaf.setColorAt(canopyIndex,new THREE.Color(['#3b7547','#4d854c','#5b8b4e'][Math.floor(random()*3)]));canopyIndex++;
+        }
+      }else{
+        for(let layer=0;layer<3;layer++){
+          const layerHeight=height*(.52+layer*.14),size=radius*(1-layer*.2);
+          temp.position.set(x,-.4+layerHeight,z);temp.scale.set(size,height*.48,size);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();pine.setMatrixAt(pineIndex,temp.matrix);
+          pine.setColorAt(pineIndex,new THREE.Color(['#244d35','#306442','#3b7248'][Math.floor(random()*3)]));pineIndex++;
+        }
       }
     });
-    trunks.count=treePositions.length;leaves.count=leafIndex;trunks.instanceMatrix.needsUpdate=true;leaves.instanceMatrix.needsUpdate=true;
-    trunks.castShadow=true;leaves.castShadow=true;forestGroup.add(trunks,leaves);
-    const bushGeo=new THREE.IcosahedronGeometry(1,1),bushes=new THREE.InstancedMesh(bushGeo,mat('#47764b'),48);
-    for(let i=0;i<48;i++){
-      const angle=(i/48)*Math.PI*2,edgeX=L/2+2.2,edgeZ=W/2+2.2;
-      let x,z;if(i%4===0){x=(random()-.5)*L;z=(random()<.5?-1:1)*edgeZ}else if(i%4===1){z=(random()-.5)*W;x=(random()<.5?-1:1)*edgeX}else{x=(random()-.5)*(L+4);z=(random()-.5)*(W+4);if(Math.abs(x)<L/2+.7&&Math.abs(z)<W/2+.7){x=Math.sign(x||1)*edgeX}}
-      const size=.35+random()*.45;temp.position.set(x,-.15,z);temp.scale.set(size,size*.7,size);temp.rotation.set(0,angle,0);temp.updateMatrix();bushes.setMatrixAt(i,temp.matrix);bushes.setColorAt(i,new THREE.Color(i%2?'#47764b':'#587f4e'));
+    trunks.instanceMatrix.needsUpdate=true;trunks.castShadow=true;forestGroup.add(trunks);
+    pine.count=pineIndex;pine.instanceMatrix.needsUpdate=true;pine.castShadow=true;forestGroup.add(pine);
+    broadleaf.count=canopyIndex;broadleaf.instanceMatrix.needsUpdate=true;broadleaf.castShadow=true;forestGroup.add(broadleaf);
+    const bushGeo=new THREE.IcosahedronGeometry(1,1),bushes=new THREE.InstancedMesh(bushGeo,mat('#47764b'),56);
+    for(let i=0;i<56;i++){
+      const edgeX=L/2+2.2,edgeZ=W/2+2.2;let x,z;
+      if(i%4===0){x=(random()-.5)*L;z=(random()<.5?-1:1)*edgeZ}
+      else if(i%4===1){z=(random()-.5)*W;x=(random()<.5?-1:1)*edgeX}
+      else{x=(random()-.5)*(L+4);z=(random()-.5)*(W+4);if(Math.abs(x)<L/2+.7&&Math.abs(z)<W/2+.7)x=Math.sign(x||1)*edgeX}
+      const size=.35+random()*.45;temp.position.set(x,-.15,z);temp.scale.set(size,size*.7,size);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();bushes.setMatrixAt(i,temp.matrix);bushes.setColorAt(i,new THREE.Color(['#47764b','#587f4e','#376541'][i%3]));
     }
     bushes.instanceMatrix.needsUpdate=true;bushes.castShadow=true;forestGroup.add(bushes);
+    const grassGeo=new THREE.ConeGeometry(1,.62,4),grass=new THREE.InstancedMesh(grassGeo,mat('#62904d'),240);
+    const grassMats=['#527e45','#6a9c51','#85a858'];
+    for(let i=0;i<80;i++){
+      const side=Math.floor(random()*4),along=(random()-.5)*(side<2?L:W),margin=1.25+random()*3.5,cx=side<2?along:(side===2?L/2+margin:-L/2-margin),cz=side===0?W/2+margin:side===1?-W/2-margin:along;
+      for(let blade=0;blade<3;blade++){
+        const x=cx+(random()-.5)*.35,z=cz+(random()-.5)*.35,size=.12+random()*.13;
+        temp.position.set(x,-.14+size*.3,z);temp.scale.set(size*.58,size,size*.58);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();grass.setMatrixAt(i*3+blade,temp.matrix);
+        grass.setColorAt(i*3+blade,new THREE.Color(grassMats[Math.floor(random()*grassMats.length)]));
+      }
+    }
+    grass.instanceMatrix.needsUpdate=true;forestGroup.add(grass);
+    const flowerGeo=new THREE.SphereGeometry(1,7,5),petals=new THREE.InstancedMesh(flowerGeo,mat('#f4d67b'),180),centers=new THREE.InstancedMesh(flowerGeo,mat('#f4c342'),36),flowerColors=['#f2d36d','#ee9bb4','#eee8da','#bf9ce5'];
+    for(let i=0;i<36;i++){
+      const side=i%4,along=(random()-.5)*(side<2?L:W),margin=2+random()*3,cx=side<2?along:(side===2?L/2+margin:-L/2-margin),cz=side===0?W/2+margin:side===1?-W/2-margin:along,color=new THREE.Color(flowerColors[i%flowerColors.length]),flowerSize=.07+random()*.035;
+      for(let petal=0;petal<5;petal++){
+        const angle=petal*Math.PI*2/5,x=cx+Math.cos(angle)*.11,z=cz+Math.sin(angle)*.11;
+        temp.position.set(x,-.02,z);temp.scale.set(flowerSize,flowerSize*.55,flowerSize);temp.rotation.set(0,angle,0);temp.updateMatrix();petals.setMatrixAt(i*5+petal,temp.matrix);petals.setColorAt(i*5+petal,color);
+      }
+      temp.position.set(cx,-.005,cz);temp.scale.set(flowerSize*.55,flowerSize*.5,flowerSize*.55);temp.rotation.set(0,0,0);temp.updateMatrix();centers.setMatrixAt(i,temp.matrix);
+    }
+    petals.instanceMatrix.needsUpdate=true;centers.instanceMatrix.needsUpdate=true;forestGroup.add(petals,centers);
     forestGroup.userData.signature=`${L}|${W}`;
   }
   function buildFloor(s) {
