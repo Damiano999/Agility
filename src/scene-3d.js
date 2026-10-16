@@ -253,12 +253,16 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     sun.shadow.camera.left = -L; sun.shadow.camera.right = L; sun.shadow.camera.top = W; sun.shadow.camera.bottom = -W; sun.shadow.camera.updateProjectionMatrix();
     camera.far = radius * 5; camera.updateProjectionMatrix();
   }
+  function routeVariants(nodes){const groups=[];for(const node of [...nodes].sort((a,b)=>a.n-b.n||(a._visitIndex??0)-(b._visitIndex??0))){const last=groups.at(-1);if(last&&last[0].n===node.n)last.push(node);else groups.push([node])}let variants=[[]];for(const group of groups){const next=[];for(const prefix of variants){for(const node of group){next.push([...prefix,node]);if(next.length>=4)break}if(next.length>=4)break}variants=next}return variants}
+  function routeVariantColor(index,base){return index===0?base:['#e56d49','#159e89','#397fd0'][(index-1)%3]}
   function buildRoute(s) {
     clearGroup(routeGroup);
     const courses=(Array.isArray(s.courses)&&s.courses.length?s.courses:[{id:s.activeCourseId||'main',obstacles:s.obstacles,route:s.route,color:s.path,routeBends:s.routeBends,visible:true}]).filter(course=>course.visible!==false);
     for(const course of courses){
       const obstacles=Array.isArray(course.obstacles)?course.obstacles:s.obstacles,byId=new Map(obstacles.map(o=>[o.id,o])),routeState={...s,obstacles,activeCourseId:course.id,route:course.route||[],routeBends:course.routeBends||{},path:course.color||s.path},visits=Array.isArray(routeState.route)?routeState.route.map((visit,index)=>({visit,index,key:typeof visit==='string'?visit:visit?.obstacleId})).filter(item=>byId.has(item.key)):[];
-      const ordered=visits.length?visits.map(({visit,index,key})=>({...byId.get(key),n:Number.isInteger(visit?.n)?visit.n:byId.get(key).n,_reverse:visit?.reverse===true,_visitIndex:index,_visitKey:`${key}@${index}`})):course.automatic===false?[]:[...obstacles].sort((a,b)=>a.n-b.n);
+      const baseOrdered=(visits.length?visits.map(({visit,index,key})=>({...byId.get(key),n:Number.isInteger(visit?.n)?visit.n:byId.get(key).n,_reverse:visit?.reverse===true,_visitIndex:index,_visitKey:`${key}@${index}`})):course.automatic===false?[]:[...obstacles].sort((a,b)=>a.n-b.n)).sort((a,b)=>a.n-b.n||(a._visitIndex??0)-(b._visitIndex??0)),variants=routeVariants(baseOrdered);
+      for(const [variantIndex,ordered] of variants.entries()){
+      const routeColor=routeVariantColor(variantIndex,course.color||s.path||'#f07851');
       const links=ordered.slice(0,-1).map((a,i)=>({ai:i,bi:i+1,a,b:ordered[i+1],prev:ordered[i-1]||a,next:ordered[i+2]||ordered[i+1]}));
       if ((s.showRoute || s.showDistances) && ordered.length > 1) {
       for (const {ai,bi,a,b,prev,next} of links) {
@@ -279,7 +283,6 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
         const c2 = p3.clone().sub(endTangent ? endTangent.multiplyScalar(align) : new THREE.Vector3(pn.x - p0.x, 0, pn.z - p0.z).multiplyScalar(.18).add(new THREE.Vector3(Math.cos(rb) * align, 0, Math.sin(rb) * align))).add(normal.clone().multiplyScalar(offset));
         const curve = new THREE.CubicBezierCurve3(p0, c1, c2, p3);
         if (s.showRoute) {
-          const routeColor=course.color||s.path||'#f07851';
           const line = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, .035, 6, false), mat(routeColor, .48));
           if(course.id===s.activeCourseId)line.userData.routeKey = routeKey; line.userData.routeNormal = normal; routeGroup.add(line);
           if (tb) {
@@ -295,14 +298,15 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
           for (let j = 1; j < samples.length; j++) meters += samples[j].distanceTo(samples[j - 1]);
           const amount = s.unit === 'ft' ? meters / .3048 : meters;
           const measurement = new THREE.BufferGeometry().setFromPoints(samples);
-          const measureLine = new THREE.Line(measurement, new THREE.LineDashedMaterial({ color: course.color||'#63d4bf', dashSize: .28, gapSize: .18, transparent: true, opacity: .88 }));
+          const measureLine = new THREE.Line(measurement, new THREE.LineDashedMaterial({ color: routeColor, dashSize: .28, gapSize: .18, transparent: true, opacity: .88 }));
           measureLine.computeLineDistances(); routeGroup.add(measureLine);
           const mid = curve.getPoint(.5), label = createLabel(String(amount.toFixed(1)) + ' ' + s.unit, '#fff5c6', '#28433b');
           label.position.set(mid.x, mid.y + .62, mid.z); label.scale.set(1.1, .28, 1); routeGroup.add(label);
         }
       }
       if (s.showRoute && ordered.length) {
-        const first=obstacleTraversal(routeState,ordered,0,s.length*(s.unit==='ft'?.3048:1),s.width*(s.unit==='ft'?.3048:1),null,ordered[1]),inside=new THREE.CatmullRomCurve3(first.points),line=new THREE.Mesh(new THREE.TubeGeometry(inside,Math.max(8,first.points.length*2),.035,6,false),mat(course.color||s.path||'#f07851',.48));line.material.depthTest=false;line.renderOrder=5;routeGroup.add(line)
+        const first=obstacleTraversal(routeState,ordered,0,s.length*(s.unit==='ft'?.3048:1),s.width*(s.unit==='ft'?.3048:1),null,ordered[1]),inside=new THREE.CatmullRomCurve3(first.points),line=new THREE.Mesh(new THREE.TubeGeometry(inside,Math.max(8,first.points.length*2),.035,6,false),mat(routeColor,.48));line.material.depthTest=false;line.renderOrder=5;routeGroup.add(line)
+      }
       }
     }
     }
