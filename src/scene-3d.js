@@ -16,7 +16,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   canvas.addEventListener('webglcontextrestored', () => update(getState()));
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#78abd0');
+  scene.background = new THREE.Color('#a9c8d5');
   scene.fog = new THREE.Fog('#a9c8d5', 75, 230);
   const camera = new THREE.PerspectiveCamera(38, 1, .1, 300);
   let viewportWidth = 0, viewportHeight = 0;
@@ -239,15 +239,26 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     clearGroup(forestGroup);
     let seed=Math.floor(L*1301+W*7919)>>>0;
     const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
-    const skyRadius=Math.hypot(L,W)*2.6+100,skyGeometry=new THREE.SphereGeometry(skyRadius,48,32),positions=skyGeometry.attributes.position,skyColors=[];
-    const horizon=new THREE.Color('#a9d0e5'),zenith=new THREE.Color('#4383bd'),earth=new THREE.Color('#294d36');
-    for(let i=0;i<positions.count;i++){const t=Math.max(-1,Math.min(1,positions.getY(i)/skyRadius));let color;if(t>=.04)color=horizon.clone().lerp(zenith,Math.min(1,(t-.04)/.96));else if(t>=-.08)color=earth.clone().lerp(horizon,(t+.08)/.12);else color=earth.clone().multiplyScalar(.82);skyColors.push(color.r,color.g,color.b)}
-    skyGeometry.setAttribute('color',new THREE.Float32BufferAttribute(skyColors,3));
-    const sky=new THREE.Mesh(skyGeometry,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide,depthWrite:false,fog:false}));sky.renderOrder=-100;forestGroup.add(sky);
-    const sunDirection=new THREE.Vector3(-.48,.62,.62).normalize(),sunPosition=sunDirection.clone().multiplyScalar(skyRadius*.82),sunDisk=new THREE.Mesh(new THREE.SphereGeometry(skyRadius*.021,24,16),new THREE.MeshBasicMaterial({color:'#fff0b8',fog:false}));
-    sunDisk.position.copy(sunPosition);sunDisk.renderOrder=-90;forestGroup.add(sunDisk);
+    const skyRadius=Math.hypot(L,W)*2.6+100,sunDirection=new THREE.Vector3(-.48,.62,.62).normalize(),sunPosition=sunDirection.clone().multiplyScalar(skyRadius*.82);
     const sunGlow=new THREE.Mesh(new THREE.SphereGeometry(skyRadius*.038,20,12),new THREE.MeshBasicMaterial({color:'#ffd879',transparent:true,opacity:.22,depthWrite:false,depthTest:false,fog:false}));
     sunGlow.position.copy(sunPosition);sunGlow.renderOrder=-95;forestGroup.add(sunGlow);
+    const sunDisk=new THREE.Mesh(new THREE.SphereGeometry(skyRadius*.021,24,16),new THREE.MeshBasicMaterial({color:'#fff0b8',fog:false}));
+    sunDisk.position.copy(sunPosition);sunDisk.renderOrder=-90;forestGroup.add(sunDisk);
+    for(const layer of [{margin:46,color:'#71858a',maxHeight:22},{margin:68,color:'#9aa9aa',maxHeight:30}]){
+      for(let side=0;side<4;side++){
+        const hx=L/2+layer.margin,hz=W/2+layer.margin,count=48,controls=Array.from({length:13},()=>.35+random()*.65),vertices=[],indices=[];
+        for(let i=0;i<=count;i++){
+          const t=i/count,scaled=t*(controls.length-1),index=Math.min(controls.length-2,Math.floor(scaled)),mix=scaled-index,profile=controls[index]*(1-mix)+controls[index+1]*mix;
+          const peakHeight=4+profile*layer.maxHeight,y=-.4+peakHeight;
+          let x,z;if(side===0){x=-hx+t*2*hx;z=-hz}else if(side===1){x=hx;z=-hz+t*2*hz}else if(side===2){x=hx-t*2*hx;z=hz}else{x=-hx;z=hz-t*2*hz}
+          vertices.push(x,-.4,z,x,y,z);
+          if(i<count){const a=i*2,b=a+2;indices.push(a,a+1,b+1,a,b+1,b)}
+        }
+        const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.setIndex(indices);geometry.computeVertexNormals();
+        const mountain=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:layer.color,roughness:1,flatShading:true,side:THREE.DoubleSide}));
+        mountain.renderOrder=-30+side;mountain.castShadow=false;mountain.receiveShadow=true;forestGroup.add(mountain);
+      }
+    }
     const ground=new THREE.Mesh(new THREE.PlaneGeometry(L+64,W+64),mat('#294d36',.98));
     ground.rotation.x=-Math.PI/2;ground.position.y=-.405;ground.receiveShadow=true;forestGroup.add(ground);
     const pondX=L/2+11.5,pondZ=W/2+11.5,pondBank=new THREE.Mesh(new THREE.CircleGeometry(1,48),mat('#756849',.95));
