@@ -16,8 +16,8 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   canvas.addEventListener('webglcontextrestored', () => update(getState()));
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#183126');
-  scene.fog = new THREE.Fog('#183126', 55, 155);
+  scene.background = new THREE.Color('#78abd0');
+  scene.fog = new THREE.Fog('#a9c8d5', 75, 230);
   const camera = new THREE.PerspectiveCamera(38, 1, .1, 300);
   let viewportWidth = 0, viewportHeight = 0;
   const target = new THREE.Vector3(0, 0, 0);
@@ -237,6 +237,15 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   function matCacheHas(material) { return [...matCache.values()].includes(material); }
   function buildForest(s,L,W) {
     clearGroup(forestGroup);
+    const skyRadius=Math.hypot(L,W)*2.6+100,skyGeometry=new THREE.SphereGeometry(skyRadius,48,32),positions=skyGeometry.attributes.position,skyColors=[];
+    const horizon=new THREE.Color('#a9d0e5'),zenith=new THREE.Color('#4383bd'),earth=new THREE.Color('#294d36');
+    for(let i=0;i<positions.count;i++){const t=Math.max(-1,Math.min(1,positions.getY(i)/skyRadius));let color;if(t>=.04)color=horizon.clone().lerp(zenith,Math.min(1,(t-.04)/.96));else if(t>=-.08)color=earth.clone().lerp(horizon,(t+.08)/.12);else color=earth.clone().multiplyScalar(.82);skyColors.push(color.r,color.g,color.b)}
+    skyGeometry.setAttribute('color',new THREE.Float32BufferAttribute(skyColors,3));
+    const sky=new THREE.Mesh(skyGeometry,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide,depthWrite:false,fog:false}));sky.renderOrder=-100;forestGroup.add(sky);
+    const sunDirection=new THREE.Vector3(-.48,.62,.62).normalize(),sunPosition=sunDirection.clone().multiplyScalar(skyRadius*.82),sunDisk=new THREE.Mesh(new THREE.SphereGeometry(skyRadius*.021,24,16),new THREE.MeshBasicMaterial({color:'#fff0b8',fog:false}));
+    sunDisk.position.copy(sunPosition);sunDisk.renderOrder=-90;forestGroup.add(sunDisk);
+    const sunGlow=new THREE.Mesh(new THREE.SphereGeometry(skyRadius*.038,20,12),new THREE.MeshBasicMaterial({color:'#ffd879',transparent:true,opacity:.22,depthWrite:false,depthTest:false,fog:false}));
+    sunGlow.position.copy(sunPosition);sunGlow.renderOrder=-95;forestGroup.add(sunGlow);
     const ground=new THREE.Mesh(new THREE.PlaneGeometry(L+64,W+64),mat('#294d36',.98));
     ground.rotation.x=-Math.PI/2;ground.position.y=-.405;ground.receiveShadow=true;forestGroup.add(ground);
     let seed=Math.floor(L*1301+W*7919)>>>0;
@@ -248,25 +257,25 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
       for(let i=0;i<countZ;i++){const z=-W/2+(i+.5)*W/countZ+(random()-.5)*2;if(!(margin===7&&Math.abs(z)<seatLength/2+2))treePositions.push([L/2+margin+(random()-.5)*2,z]);treePositions.push([-L/2-margin+(random()-.5)*2,z])}
     }
     const temp=new THREE.Object3D(),trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(.13,.22,1,6),mat('#62472f'),treePositions.length),
-      pine=new THREE.InstancedMesh(new THREE.ConeGeometry(1,1.25,7),mat('#2c5c3d'),treePositions.length*3),
-      broadleaf=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,1),mat('#47764b'),treePositions.length*3);
+      pine=new THREE.InstancedMesh(new THREE.ConeGeometry(1,1.2,10),mat('#2c5c3d'),treePositions.length*5),
+      broadleaf=new THREE.InstancedMesh(new THREE.SphereGeometry(1,14,10),mat('#47764b'),treePositions.length*4);
     let pineIndex=0,canopyIndex=0;
     treePositions.forEach(([x,z],i)=>{
       const height=4.4+random()*3.5,isBroadleaf=i%3===0;
       temp.position.set(x,-.4+height/2,z);temp.scale.set(1,height,1);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();trunks.setMatrixAt(i,temp.matrix);
       trunks.setColorAt(i,new THREE.Color(isBroadleaf?'#705037':'#62472f'));
-      const radius=1.25+random()*.7;
+      const radius=1.35+random()*.8;
       if(isBroadleaf){
-        for(let cluster=0;cluster<3;cluster++){
-          const angle=cluster*Math.PI*2/3+random()*.5,spread=radius*.42,clusterSize=radius*(.56+random()*.16);
+        for(let cluster=0;cluster<4;cluster++){
+          const angle=cluster*Math.PI/2+random()*.5,spread=radius*.34,clusterSize=radius*(.48+random()*.18);
           temp.position.set(x+Math.cos(angle)*spread,-.4+height*.7+(random()-.5)*.5,z+Math.sin(angle)*spread);
           temp.scale.set(clusterSize,clusterSize*.82,clusterSize);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();broadleaf.setMatrixAt(canopyIndex,temp.matrix);
           broadleaf.setColorAt(canopyIndex,new THREE.Color(['#3b7547','#4d854c','#5b8b4e'][Math.floor(random()*3)]));canopyIndex++;
         }
       }else{
         for(let layer=0;layer<3;layer++){
-          const layerHeight=height*(.52+layer*.14),size=radius*(1-layer*.2);
-          temp.position.set(x,-.4+layerHeight,z);temp.scale.set(size,height*.48,size);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();pine.setMatrixAt(pineIndex,temp.matrix);
+          const layerHeight=height*(.4+layer*.105),size=radius*(1-layer*.115);
+          temp.position.set(x,-.4+layerHeight,z);temp.scale.set(size,height*.34,size);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();pine.setMatrixAt(pineIndex,temp.matrix);
           pine.setColorAt(pineIndex,new THREE.Color(['#244d35','#306442','#3b7248'][Math.floor(random()*3)]));pineIndex++;
         }
       }
