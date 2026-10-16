@@ -6,7 +6,7 @@ const obstacleColors = {
   tire: '#ef7868', aFrame: '#16a6a9', dogWalk: '#16a6a9', seesaw: '#16a6a9', tunnel: '#18aab9', chute: '#ed7863', weave: '#ef7868',
 };
 
-export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRotate, onEditNumber, onEditMarker, onAddMarker, onDone, onError }) {
+export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRotate, onEditNumber, onMoveNumber, onEditMarker, onAddMarker, onDone, onError }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -213,7 +213,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   function obstacleBadgeSignature(obstacle,s=getState()){const route=Array.isArray(s.route)?s.route:[],numbers=route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id).map(item=>Number.isInteger(item.visit?.n)?item.visit.n:obstacle.n);return `${obstacle.n}|${obstacle.label||''}|${numbers.join(',')}`}
   function createObstacleBadge(group, obstacle, s=getState()) {
     const badges=new THREE.Group(),route=Array.isArray(s.route)?s.route:[],visits=route.map((visit,index)=>({visit,index})).filter(item=>(typeof item.visit==='string'?item.visit:item.visit?.obstacleId)===obstacle.id),items=visits.length?visits:[{visit:null,index:null}],height=Number(obstacle.height)||(obstacle.type==='dogWalk'?1.2:1.7),depth=obstacleFootprint(obstacle).depth;
-    for(let i=0;i<items.length;i++){const {visit,index}=items[i],number=Number.isInteger(visit?.n)?visit.n:obstacle.n,badge=createLabel(`${number}${obstacle.label?` · ${obstacle.label}`:''}`, '#fff8e8', '#234238');badge.userData.obstacleId=obstacle.id;badge.userData.visitIndex=index;badge.userData.numberBadge=true;badge.userData.courseId=s.activeCourseId;const spread=(i-(items.length-1)/2)*.52,offset=depth/2+1.05,vertical=visit?.numberPosition,rotation=-(Number(obstacle.rotation)||0)*Math.PI/180,verticalSign=vertical==='top'?-1:1;badge.position.x=spread+(vertical?-Math.sin(rotation)*verticalSign*offset:0);badge.position.z=vertical?Math.cos(rotation)*verticalSign*offset:obstacleEntrySide(obstacle,s,index)*(visit?.reverse===true?-1:1)*offset;badge.scale.set(1.45,.34,1);badges.add(badge)}
+    for(let i=0;i<items.length;i++){const {visit,index}=items[i],number=Number.isInteger(visit?.n)?visit.n:obstacle.n,badge=createLabel(`${number}${obstacle.label?` · ${obstacle.label}`:''}`, '#fff8e8', '#234238');badge.userData.obstacleId=obstacle.id;badge.userData.visitIndex=index;badge.userData.numberBadge=true;badge.userData.courseId=s.activeCourseId;const spread=(i-(items.length-1)/2)*.52,offset=depth/2+1.05,vertical=visit?.numberPosition,rotation=-(Number(obstacle.rotation)||0)*Math.PI/180,verticalSign=vertical==='top'?-1:1,numberOffset=visit?.numberOffset,unitScale=s.unit==='ft'?.3048:1,worldDx=(Number(numberOffset?.x)||0)*s.length*unitScale,worldDz=(Number(numberOffset?.y)||0)*s.width*unitScale,localDx=Math.cos(-rotation)*worldDx+Math.sin(-rotation)*worldDz,localDz=-Math.sin(-rotation)*worldDx+Math.cos(-rotation)*worldDz;badge.position.x=spread+(vertical?-Math.sin(rotation)*verticalSign*offset:0)+localDx;badge.position.z=(vertical?Math.cos(rotation)*verticalSign*offset:obstacleEntrySide(obstacle,s,index)*(visit?.reverse===true?-1:1)*offset)+localDz;badge.scale.set(1.45,.34,1);badges.add(badge)}
     badges.position.y=obstacle.type==='aFrame'?height+.42:obstacle.type==='dogWalk'?height+.42:1.3;group.add(badges);return badges;
   }
   function createLabel(text, foreground = '#f3f7ee', background = '#1b2b25') {
@@ -379,7 +379,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     }
     if(markerHit){onEditMarker?.(markerHit.object.userData.looseMarkerId,markerHit.object.userData.courseId);e.preventDefault();return}
     const badgeHit=intersections.find(h=>h.object.userData.numberBadge);
-    if(badgeHit&&getState().showNumbers){const id=badgeHit.object.userData.obstacleId,courseId=badgeHit.object.userData.courseId;onSelect(id,courseId);onEditNumber?.(id,badgeHit.object.userData.visitIndex??null);e.preventDefault();return}
+    if(badgeHit&&getState().showNumbers){const id=badgeHit.object.userData.obstacleId,courseId=badgeHit.object.userData.courseId,group=obstacleGroup.children.find(item=>item.userData.obstacleId===id),badge=badgeHit.object,badgeWorld=new THREE.Vector3();badge.getWorldPosition(badgeWorld);const plane=new THREE.Plane(new THREE.Vector3(0,1,0),-badgeWorld.y);ray(e);const pointerStart=new THREE.Vector3();if(!caster.ray.intersectPlane(plane,pointerStart))return;action={type:'numberBadge',id,courseId,visitIndex:badge.userData.visitIndex??null,badge,group,plane,pointerStart,badgeWorld,startX:e.clientX,startY:e.clientY,moved:false};canvas.setPointerCapture(e.pointerId);e.preventDefault();return}
     if (getState().tool === 'route') {
       caster.params.Line = { threshold: .18 };
       const hits = caster.intersectObjects(routeGroup.children, true).filter(h => h.object.userData.routeKey);
@@ -414,6 +414,10 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
       const screenUp = new THREE.Vector3(-Math.sin(azimuth) * Math.sin(elevation), 0, -Math.cos(azimuth) * Math.sin(elevation));
       target.addScaledVector(right, -dx * scale).addScaledVector(screenUp, dy * scale);
       last = { x: e.clientX, y: e.clientY }; update(getState());
+    } else if (action.type === 'numberBadge') {
+      if(!action.moved&&Math.hypot(e.clientX-action.startX,e.clientY-action.startY)<4)return;
+      action.moved=true;ray(e);const point=new THREE.Vector3();if(!caster.ray.intersectPlane(action.plane,point))return;
+      const world=action.badgeWorld.clone().add(point.sub(action.pointerStart)),local=action.badge.parent.worldToLocal(world);action.badge.position.copy(local);action.badge.parent.updateMatrixWorld(true);
     } else if (action.type === 'move') {
       ray(e); const point = new THREE.Vector3(); if (!caster.ray.intersectPlane(ground, point)) return;
       const x = point.x + action.offset.x, z = point.z + action.offset.z, s = getState();
@@ -430,7 +434,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
       onBend(action.key, Math.max(-.28, Math.min(.28, action.initial + delta / Math.min(s.length * unitScale, s.width * unitScale))));
     }
   });
-  const finish = () => { if (action?.type === 'move' && action.moved) onDone(); if (action?.type === 'bend'||action?.type==='rotate') onDone(); action = null; last = null; };
+  const finish = () => { if(action?.type==='numberBadge'){if(action.moved){const badgeWorld=new THREE.Vector3(),obstacleWorld=new THREE.Vector3(),s=getState(),unitScale=s.unit==='ft'?.3048:1;action.badge.getWorldPosition(badgeWorld);action.group.getWorldPosition(obstacleWorld);onMoveNumber?.(action.id,action.visitIndex,(badgeWorld.x-obstacleWorld.x)/(s.length*unitScale),(badgeWorld.z-obstacleWorld.z)/(s.width*unitScale),action.courseId);onDone()}else{onSelect(action.id,action.courseId);onEditNumber?.(action.id,action.visitIndex)}}if (action?.type === 'move' && action.moved) onDone(); if (action?.type === 'bend'||action?.type==='rotate') onDone(); action = null; last = null; };
   canvas.addEventListener('pointerup', finish); canvas.addEventListener('pointercancel', finish);
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('wheel', e => { distance = Math.max(10, Math.min(130, distance * (e.deltaY > 0 ? 1.08 : .92))); update(getState()); clearTimeout(wheelTimeout); wheelTimeout = setTimeout(onDone, 400); e.preventDefault(); }, { passive: false });
