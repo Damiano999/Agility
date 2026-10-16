@@ -50,3 +50,18 @@
 .course-manager .course-row .course-actions>.course-visible,.course-manager .course-row .course-actions>.course-color-option{height:32px}
 .course-manager .course-row .course-actions>.course-clear{display:flex;align-items:center;justify-content:center;height:30px;padding:0 8px;font-size:10px;line-height:1.2;white-space:normal}
 .course-manager .course-row .course-actions>.course-remove{display:flex;align-items:center;justify-content:center;height:27px;padding:0 8px;font-size:9px;line-height:1.1;font-weight:600;white-space:normal}
+
+/* Expandable sidebar sections */
+.sidebar-section{margin:0 0 12px;min-width:0}
+.sidebar-section>summary,.sidebar-collapse>summary{position:relative;display:flex;align-items:center;gap:8px;list-style:none;cursor:pointer;user-select:none;padding-right:20px}
+.sidebar-section>summary::-webkit-details-marker,.sidebar-collapse>summary::-webkit-details-marker{display:none}
+.sidebar-section>summary::after,.sidebar-collapse>summary::after{content:'⌄';position:absolute;right:5px;top:50%;transform:translateY(-55%);color:#b9a6cc;font-size:16px;line-height:1;transition:transform .16s ease}
+.sidebar-section[open]>summary::after,.sidebar-collapse[open]>summary::after{transform:translateY(-45%) rotate(180deg)}
+.sidebar-section>summary:hover,.sidebar-collapse>summary:hover{color:#f7f1fc}
+.sidebar-section-body{min-width:0}
+.sidebar-section[open]>summary{margin-bottom:12px}
+.sidebar-collapse{padding:13px;margin-bottom:12px}
+.sidebar-collapse>summary.card-title{margin:0 0 0;font-size:12px}
+.sidebar-collapse[open]>summary.card-title{margin-bottom:12px}
+.sidebar-collapse>.collapse-content{min-width:0}
+@media(max-width:850px){.sidebar-section{margin-bottom:10px}.sidebar-collapse{margin-bottom:10px}}
