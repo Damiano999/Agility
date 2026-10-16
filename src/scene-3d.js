@@ -377,7 +377,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
       route.push(point(-hx-random()*3,-hz-random()*3),point((random()-.5)*L,-hz-random()*4),point(hx+random()*3,-hz-random()*3),point(hx+random()*4,(random()-.5)*W),point(hx+random()*3,hz+random()*3),point((random()-.5)*L,hz+random()*4),point(-hx-random()*3,hz+random()*3),point(-hx-random()*4,(random()-.5)*W));
       if(index%2)route.reverse();
       const lengths=route.map((p,i)=>{const q=route[(i+1)%route.length];return Math.hypot(q.x-p.x,q.z-p.z)}),totalLength=lengths.reduce((sum,value)=>sum+value,0);
-      root.userData.walk.route=route;root.userData.walk.lengths=lengths;root.userData.walk.totalLength=totalLength;
+      root.userData.walk.route=route;root.userData.walk.lengths=lengths;root.userData.walk.totalLength=totalLength;root.position.set(route[0].x,-.4,route[0].z);
       forestGroup.add(root);forestAnimals.push(root);
     }
     if(!animalAnimationTimer)animalAnimationTimer=window.setInterval(()=>{
