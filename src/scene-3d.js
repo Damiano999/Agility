@@ -89,7 +89,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     }
     return new THREE.CatmullRomCurve3(pts);
   }
-  function weaveTraversalShape(count){const half=(count-1)*.3;return[{x:-half-.9,y:0},...Array.from({length:count},(_,i)=>({x:(i-(count-1)/2)*.6,y:i%2?-.55:.55})),{x:half+.9,y:0}]}
+  function weaveTraversalShape(count){const half=(count-1)*.3,amplitude=.42,start=-half-.9,end=half+.9,points=[];for(let x=start;x<=end+.001;x+=.075){let y;if(x< -half){const t=Math.max(0,Math.min(1,(x-start)/.9));y=amplitude*(1-Math.cos(Math.PI*t))/2}else if(x>half){const t=Math.max(0,Math.min(1,(x-half)/.9));y=amplitude*(1+Math.cos(Math.PI*t))/2}else y=amplitude*Math.cos(Math.PI*(x+half)/.6);points.push({x,y})}points.push({x:end,y:0});return points}
   function obstacleTraversal(s, nodes, index, L, W, beforeOverride, afterOverride) {
     const obstacle = nodes[index];
     const rotation = (Number(obstacle.rotation) || 0) * Math.PI / 180;
