@@ -71,3 +71,9 @@
 .sidebar-section[open]>summary::after,.sidebar-collapse[open]>summary::after{transform:translateY(-35%) rotate(225deg)}
 .sidebar-section>summary,.sidebar-collapse>summary{min-height:24px}
 .sidebar-collapse>summary.card-title{padding-right:24px}
+
+.tool-clear-course{border-color:#684e7c;color:#e8a0cf;background:#ffffff04}
+.tool-clear-course svg{color:inherit}
+.tool-clear-course:hover{border-color:#b45f80;background:#482b43;color:#ffb5d4}
+.sidebar-info .sidebar-section-body{display:grid;gap:7px}
+.sidebar-info .tutorial-open{margin:0;min-height:34px}
