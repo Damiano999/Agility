@@ -6,7 +6,7 @@ const obstacleColors = {
   tire: '#ef7868', aFrame: '#16a6a9', dogWalk: '#16a6a9', seesaw: '#16a6a9', tunnel: '#18aab9', chute: '#ed7863', weave: '#ef7868',
 };
 
-export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRotate, onEditNumber, onEditMarker, onDone, onError }) {
+export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRotate, onEditNumber, onEditMarker, onAddMarker, onDone, onError }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -367,6 +367,16 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   canvas.addEventListener('pointerdown', e => {
     ray(e);
     const intersections=caster.intersectObjects([obstacleGroup,markerGroup],true),markerHit=intersections.find(h=>h.object.userData.looseMarkerId);
+    const state=getState();
+    if(state.tool==='marker'||state.tool==='marker2'){
+      const point=new THREE.Vector3();
+      if(caster.ray.intersectPlane(ground,point)){
+        const unitScale=state.unit==='ft'?.3048:1,variant=state.tool==='marker2'?2:1;
+        const x=Math.max(.02,Math.min(.98,point.x/(state.length*unitScale)+.5)),y=Math.max(.03,Math.min(.97,point.z/(state.width*unitScale)+.5));
+        onAddMarker?.(x,y,variant);
+      }
+      e.preventDefault();return;
+    }
     if(markerHit){onEditMarker?.(markerHit.object.userData.looseMarkerId,markerHit.object.userData.courseId);e.preventDefault();return}
     const badgeHit=intersections.find(h=>h.object.userData.numberBadge);
     if(badgeHit&&getState().showNumbers){const id=badgeHit.object.userData.obstacleId,courseId=badgeHit.object.userData.courseId;onSelect(id,courseId);onEditNumber?.(id,badgeHit.object.userData.visitIndex??null);e.preventDefault();return}
