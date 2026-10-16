@@ -287,8 +287,8 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     for(let i=0;i<80;i++){
       const side=Math.floor(random()*4),along=(random()-.5)*(side<2?L:W),margin=1.25+random()*3.5,cx=side<2?along:(side===2?L/2+margin:-L/2-margin),cz=side===0?W/2+margin:side===1?-W/2-margin:along;
       for(let blade=0;blade<3;blade++){
-        const x=cx+(random()-.5)*.35,z=cz+(random()-.5)*.35,size=.12+random()*.13;
-        temp.position.set(x,-.14+size*.3,z);temp.scale.set(size*.58,size,size*.58);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();grass.setMatrixAt(i*3+blade,temp.matrix);
+        const x=cx+(random()-.5)*.35,z=cz+(random()-.5)*.35,size=.26+random()*.22;
+        temp.position.set(x,-.4+size*.5,z);temp.scale.set(size*.58,size,size*.58);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();grass.setMatrixAt(i*3+blade,temp.matrix);
         grass.setColorAt(i*3+blade,new THREE.Color(grassMats[Math.floor(random()*grassMats.length)]));
       }
     }
@@ -298,9 +298,9 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
       const side=i%4,along=(random()-.5)*(side<2?L:W),margin=2+random()*3,cx=side<2?along:(side===2?L/2+margin:-L/2-margin),cz=side===0?W/2+margin:side===1?-W/2-margin:along,color=new THREE.Color(flowerColors[i%flowerColors.length]),flowerSize=.07+random()*.035;
       for(let petal=0;petal<5;petal++){
         const angle=petal*Math.PI*2/5,x=cx+Math.cos(angle)*.11,z=cz+Math.sin(angle)*.11;
-        temp.position.set(x,-.02,z);temp.scale.set(flowerSize,flowerSize*.55,flowerSize);temp.rotation.set(0,angle,0);temp.updateMatrix();petals.setMatrixAt(i*5+petal,temp.matrix);petals.setColorAt(i*5+petal,color);
+        temp.position.set(x,-.32,z);temp.scale.set(flowerSize,flowerSize*.55,flowerSize);temp.rotation.set(0,angle,0);temp.updateMatrix();petals.setMatrixAt(i*5+petal,temp.matrix);petals.setColorAt(i*5+petal,color);
       }
-      temp.position.set(cx,-.005,cz);temp.scale.set(flowerSize*.55,flowerSize*.5,flowerSize*.55);temp.rotation.set(0,0,0);temp.updateMatrix();centers.setMatrixAt(i,temp.matrix);
+      temp.position.set(cx,-.31,cz);temp.scale.set(flowerSize*.55,flowerSize*.5,flowerSize*.55);temp.rotation.set(0,0,0);temp.updateMatrix();centers.setMatrixAt(i,temp.matrix);
     }
     petals.instanceMatrix.needsUpdate=true;centers.instanceMatrix.needsUpdate=true;forestGroup.add(petals,centers);
     forestGroup.userData.signature=`${L}|${W}`;
