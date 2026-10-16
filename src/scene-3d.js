@@ -89,13 +89,14 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     }
     return new THREE.CatmullRomCurve3(pts);
   }
+  function weaveTraversalShape(count){const half=(count-1)*.3;return[{x:-half-.9,y:0},...Array.from({length:count},(_,i)=>({x:(i-(count-1)/2)*.6,y:i%2?-.55:.55})),{x:half+.9,y:0}]}
   function obstacleTraversal(s, nodes, index, L, W, beforeOverride, afterOverride) {
     const obstacle = nodes[index];
     const rotation = (Number(obstacle.rotation) || 0) * Math.PI / 180;
     const { depth } = obstacleFootprint(obstacle);
     let localPoints;
     if (obstacle.type === 'tunnel') localPoints = makeTunnelCurve(Math.max(3, Math.min(6, Number(obstacle.length) || 4.5)), obstacle.bend).getPoints(40);
-    else if (obstacle.type === 'weave') { const count = Number(obstacle.poleCount) === 6 ? 6 : 12; localPoints = [new THREE.Vector3(-((count - 1) * .3 + .3), .55, 0), ...Array.from({ length: count }, (_, i) => new THREE.Vector3((i - (count - 1) / 2) * .6, .55, i % 2 ? .27 : -.27)), new THREE.Vector3((count - 1) * .3 + .3, .55, 0)]; }
+    else if (obstacle.type === 'weave') { const count=Number(obstacle.poleCount)===6?6:12;localPoints=weaveTraversalShape(count).map(point=>new THREE.Vector3(point.x,.55,point.y)); }
     else {
       const steps = ['aFrame', 'dogWalk', 'seesaw'].includes(obstacle.type) ? 32 : 1;
       localPoints = Array.from({ length: steps + 1 }, (_, i) => {
@@ -306,9 +307,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
           label.position.set(mid.x, mid.y + .62, mid.z); label.scale.set(1.1, .28, 1); routeGroup.add(label);
         }
       }
-      if (s.showRoute && ordered.length) {
-        const first=obstacleTraversal(routeState,ordered,0,s.length*(s.unit==='ft'?.3048:1),s.width*(s.unit==='ft'?.3048:1),null,ordered[1]),inside=new THREE.CatmullRomCurve3(first.points),line=new THREE.Mesh(new THREE.TubeGeometry(inside,Math.max(8,first.points.length*2),.035,6,false),mat(routeColor,.48));line.material.depthTest=false;line.renderOrder=5;routeGroup.add(line)
-      }
+      if(s.showRoute&&ordered.length){const unitScale=s.unit==='ft'?.3048:1,L=s.length*unitScale,W=s.width*unitScale;for(let obstacleIndex=0;obstacleIndex<ordered.length;obstacleIndex++){if(obstacleIndex!==0&&ordered[obstacleIndex].type!=='weave')continue;const traversal=obstacleTraversal(routeState,ordered,obstacleIndex,L,W,ordered[obstacleIndex-1],ordered[obstacleIndex+1]),inside=new THREE.CatmullRomCurve3(traversal.points),line=new THREE.Mesh(new THREE.TubeGeometry(inside,Math.max(8,traversal.points.length*2),.035,6,false),mat(routeColor,.48));line.material.depthTest=false;line.renderOrder=5;routeGroup.add(line)}}
       }
     }
     }
