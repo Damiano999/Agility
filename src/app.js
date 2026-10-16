@@ -2,7 +2,7 @@ import { drawObstacle, obstacleFootprint, obstacleEntrySide, tunnelPath } from '
 (()=>{'use strict';
 const $=s=>document.querySelector(s), canvas=$('#courseCanvas'),ctx=canvas.getContext('2d'),frame=$('#frame'),canvasWrap=$('#canvasWrap');
 const boardLogoImage=document.querySelector('.board-logo img');
-const names={jump:'Skok pojedynczy',spread:'Skok podwójny',wall:'Ściana / panel',longJump:'Skok w dal',tire:'Koło',aFrame:'Palizada A',dogWalk:'Kładka',seesaw:'Huśtawka',tunnel:'Tunel otwarty',weave:'Slalom'};
+const names={jump:'Skok pojedynczy',spread:'Skok podwójny',wall:'Murek',longJump:'Skok w dal',tire:'Koło',aFrame:'Palizada A',dogWalk:'Kładka',seesaw:'Huśtawka',tunnel:'Tunel otwarty',weave:'Slalom'};
 let state={title:'Mój pierwszy tor',length:40,width:24,gridSize:2,unit:'m',bg:'#f3eefb',ob:'#59456f',path:'#8b5cf6',grid:true,showRoute:true,showNumbers:true,showLooseNumbers:true,showDistances:false,obstacles:[],route:[],routeBends:{},markers:[],selected:null,selectedMarker:null,tool:'select',zoom:100,view:'2d',courses:[],activeCourseId:null};
 let hist=[],future=[],drag=null,markerDrag=null,dragCurve=null,dragRotation=null,changedTimer,toastTimer,scene3d=null,scene3dLoading=null;
 let gridCacheCanvas=null,gridCacheKey='',editingVisitIndex=null,editingMarkerId=null,routeDrag=null,panDrag=null;
