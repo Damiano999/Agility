@@ -16,8 +16,8 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   canvas.addEventListener('webglcontextrestored', () => update(getState()));
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#21182e');
-  scene.fog = new THREE.Fog('#21182e', 35, 110);
+  scene.background = new THREE.Color('#183126');
+  scene.fog = new THREE.Fog('#183126', 55, 155);
   const camera = new THREE.PerspectiveCamera(38, 1, .1, 300);
   let viewportWidth = 0, viewportHeight = 0;
   const target = new THREE.Vector3(0, 0, 0);
@@ -35,6 +35,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   };
   const floorGroup = new THREE.Group(), obstacleGroup = new THREE.Group(), routeGroup = new THREE.Group(), markerGroup = new THREE.Group();
   scene.add(floorGroup, routeGroup, obstacleGroup, markerGroup);
+  const forestGroup = new THREE.Group(); scene.add(forestGroup);
 
   function addBox(group, color, x, y, z, w, h, d, options = {}) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, options.roughness ?? .72, options.metalness ?? 0));
@@ -233,6 +234,43 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     }
   }
   function matCacheHas(material) { return [...matCache.values()].includes(material); }
+  function buildForest(s,L,W) {
+    clearGroup(forestGroup);
+    const ground=new THREE.Mesh(new THREE.PlaneGeometry(L+64,W+64),mat('#294d36',.98));
+    ground.rotation.x=-Math.PI/2;ground.position.y=-.405;ground.receiveShadow=true;forestGroup.add(ground);
+    let seed=Math.floor(L*1301+W*7919)>>>0;
+    const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+    const treePositions=[];
+    for(const margin of [7,16]){
+      const spacing=8,countX=Math.max(2,Math.ceil(L/spacing)),countZ=Math.max(2,Math.ceil(W/spacing));
+      for(let i=0;i<countX;i++){const x=-L/2+(i+.5)*L/countX+(random()-.5)*2;treePositions.push([x,W/2+margin+(random()-.5)*2],[x,-W/2-margin+(random()-.5)*2])}
+      for(let i=0;i<countZ;i++){const z=-W/2+(i+.5)*W/countZ+(random()-.5)*2;treePositions.push([L/2+margin+(random()-.5)*2,z],[-L/2-margin+(random()-.5)*2,z])}
+    }
+    const trunkGeo=new THREE.CylinderGeometry(.13,.22,1,6),leafGeo=new THREE.ConeGeometry(1,1.25,7);
+    const trunks=new THREE.InstancedMesh(trunkGeo,mat('#62472f'),treePositions.length);
+    const leaves=new THREE.InstancedMesh(leafGeo,mat('#2c5c3d'),treePositions.length*3);
+    const temp=new THREE.Object3D();let leafIndex=0;
+    treePositions.forEach(([x,z],i)=>{
+      const height=4.4+random()*3.5;
+      temp.position.set(x,-.4+height/2,z);temp.scale.set(1,height,1);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();trunks.setMatrixAt(i,temp.matrix);
+      const radius=1.25+random()*.7;
+      for(let layer=0;layer<3;layer++){
+        const layerHeight=height*(.52+layer*.14),size=radius*(1-layer*.2);
+        temp.position.set(x,-.4+layerHeight,z);temp.scale.set(size,height*.48,size);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();leaves.setMatrixAt(leafIndex,temp.matrix);
+        leaves.setColorAt(leafIndex,new THREE.Color(['#244d35','#306442','#3b7248'][Math.floor(random()*3)]));leafIndex++;
+      }
+    });
+    trunks.count=treePositions.length;leaves.count=leafIndex;trunks.instanceMatrix.needsUpdate=true;leaves.instanceMatrix.needsUpdate=true;
+    trunks.castShadow=true;leaves.castShadow=true;forestGroup.add(trunks,leaves);
+    const bushGeo=new THREE.IcosahedronGeometry(1,1),bushes=new THREE.InstancedMesh(bushGeo,mat('#47764b'),48);
+    for(let i=0;i<48;i++){
+      const angle=(i/48)*Math.PI*2,edgeX=L/2+2.2,edgeZ=W/2+2.2;
+      let x,z;if(i%4===0){x=(random()-.5)*L;z=(random()<.5?-1:1)*edgeZ}else if(i%4===1){z=(random()-.5)*W;x=(random()<.5?-1:1)*edgeX}else{x=(random()-.5)*(L+4);z=(random()-.5)*(W+4);if(Math.abs(x)<L/2+.7&&Math.abs(z)<W/2+.7){x=Math.sign(x||1)*edgeX}}
+      const size=.35+random()*.45;temp.position.set(x,-.15,z);temp.scale.set(size,size*.7,size);temp.rotation.set(0,angle,0);temp.updateMatrix();bushes.setMatrixAt(i,temp.matrix);bushes.setColorAt(i,new THREE.Color(i%2?'#47764b':'#587f4e'));
+    }
+    bushes.instanceMatrix.needsUpdate=true;bushes.castShadow=true;forestGroup.add(bushes);
+    forestGroup.userData.signature=`${L}|${W}`;
+  }
   function buildFloor(s) {
     clearGroup(floorGroup);
     const unitScale = s.unit === 'ft' ? .3048 : 1, L = (Number(s.length) || 40) * unitScale, W = (Number(s.width) || 24) * unitScale;
@@ -328,6 +366,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     const signature = `${(Number(s.length) || 40) * unitScale}|${(Number(s.width) || 24) * unitScale}|${s.grid}|${s.gridSize}|${s.unit}`;
     if (floorGroup.userData.signature !== signature) buildFloor(s);
     const L = (Number(s.length) || 40) * unitScale, W = (Number(s.width) || 24) * unitScale;
+    if(forestGroup.userData.signature!==`${L}|${W}`)buildForest(s,L,W);
     const visibleCourses=(Array.isArray(s.courses)&&s.courses.length?s.courses:[{id:s.activeCourseId||'main',obstacles:s.obstacles,route:s.route,routeBends:s.routeBends,color:s.path,visible:true}]).filter(course=>course.visible!==false),liveIds=new Set(),obstacleGroups=new Map(obstacleGroup.children.map(child=>[child.userData.obstacleId,child]));
     for (const course of visibleCourses) for (const obstacle of course.obstacles||s.obstacles) {
       const courseState={...s,activeCourseId:course.id,obstacles:course.obstacles||s.obstacles,route:course.route||[],routeBends:course.routeBends||{},path:course.color||s.path};
@@ -441,6 +480,6 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('wheel', e => { distance = Math.max(10, Math.min(130, distance * (e.deltaY > 0 ? 1.08 : .92))); update(getState()); clearTimeout(wheelTimeout); wheelTimeout = setTimeout(onDone, 400); e.preventDefault(); }, { passive: false });
   const observer = new ResizeObserver(() => update(getState())); observer.observe(canvas.parentElement);
-  return { update, renderer, dispose() { observer.disconnect(); clearGroup(obstacleGroup); clearGroup(routeGroup); clearGroup(floorGroup); renderer.dispose(); } };
+  return { update, renderer, dispose() { observer.disconnect(); clearGroup(obstacleGroup); clearGroup(routeGroup); clearGroup(floorGroup); clearGroup(forestGroup); renderer.dispose(); } };
 }
 
