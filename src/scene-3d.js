@@ -19,6 +19,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   scene.background = new THREE.Color('#21182e');
   scene.fog = new THREE.Fog('#21182e', 35, 110);
   const camera = new THREE.PerspectiveCamera(38, 1, .1, 300);
+  let viewportWidth = 0, viewportHeight = 0;
   const target = new THREE.Vector3(0, 0, 0);
   let azimuth = .72, elevation = .78, distance = 52;
   const hemi = new THREE.HemisphereLight('#f5ffe9', '#687568', 2.3); scene.add(hemi);
@@ -328,20 +329,20 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     const signature = `${(Number(s.length) || 40) * unitScale}|${(Number(s.width) || 24) * unitScale}|${s.grid}|${s.gridSize}|${s.unit}`;
     if (floorGroup.userData.signature !== signature) buildFloor(s);
     const L = (Number(s.length) || 40) * unitScale, W = (Number(s.width) || 24) * unitScale;
-    const visibleCourses=(Array.isArray(s.courses)&&s.courses.length?s.courses:[{id:s.activeCourseId||'main',obstacles:s.obstacles,route:s.route,routeBends:s.routeBends,color:s.path,visible:true}]).filter(course=>course.visible!==false),liveIds = new Set();
+    const visibleCourses=(Array.isArray(s.courses)&&s.courses.length?s.courses:[{id:s.activeCourseId||'main',obstacles:s.obstacles,route:s.route,routeBends:s.routeBends,color:s.path,visible:true}]).filter(course=>course.visible!==false),liveIds=new Set(),obstacleGroups=new Map(obstacleGroup.children.map(child=>[child.userData.obstacleId,child]));
     for (const course of visibleCourses) for (const obstacle of course.obstacles||s.obstacles) {
       const courseState={...s,activeCourseId:course.id,obstacles:course.obstacles||s.obstacles,route:course.route||[],routeBends:course.routeBends||{},path:course.color||s.path};
       liveIds.add(obstacle.id);
-      let g = obstacleGroup.children.find(child => child.userData.obstacleId === obstacle.id);
+      let g = obstacleGroups.get(obstacle.id);
       const geometrySignature = `${obstacle.type}|${obstacle.length || ''}|${obstacle.bend || ''}|${obstacle.height || ''}|${obstacle.poleCount || ''}`;
       if (!g || g.userData.geometrySignature !== geometrySignature) {
         if (g) { obstacleGroup.remove(g); disposeObject(g); }
-        g = makeObstacle(obstacle,courseState); obstacleGroup.add(g);
+        g = makeObstacle(obstacle,courseState); obstacleGroup.add(g); obstacleGroups.set(obstacle.id,g);
       } else if (g.userData.badgeSignature !== obstacleBadgeSignature(obstacle,courseState)) {
         g.remove(g.userData.badge); g.userData.badge?.traverse?.(item=>{item.material?.map?.dispose?.();item.material?.dispose?.()});
         g.userData.badge = createObstacleBadge(g, obstacle,courseState); g.userData.badgeSignature = obstacleBadgeSignature(obstacle,courseState);
       }
-      g.userData.courseId=course.id;g.traverse(obj=>{obj.userData.obstacleId=obstacle.id;obj.userData.courseId=course.id});
+      if(g.userData.courseId!==course.id){g.userData.courseId=course.id;g.traverse(obj=>{obj.userData.obstacleId=obstacle.id;obj.userData.courseId=course.id})}
       g.userData.badge.visible = !!s.showNumbers;
       g.position.set((obstacle.x - .5) * L, .045, (obstacle.y - .5) * W);
       g.rotation.y = -(Number(obstacle.rotation) || 0) * Math.PI / 180;
@@ -354,7 +355,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     camera.position.set(target.x + Math.sin(azimuth) * Math.cos(elevation) * distance, target.y + Math.sin(elevation) * distance, target.z + Math.cos(azimuth) * Math.cos(elevation) * distance);
     camera.lookAt(target);
     const rect = canvas.getBoundingClientRect();
-    if (rect.width && rect.height) { renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; camera.updateProjectionMatrix(); }
+    if(rect.width&&rect.height&&(rect.width!==viewportWidth||rect.height!==viewportHeight)){renderer.setSize(rect.width,rect.height,false);viewportWidth=rect.width;viewportHeight=rect.height;camera.aspect=rect.width/rect.height;camera.updateProjectionMatrix()}
     renderer.render(scene, camera);
   }
   function disposeObject(object) {
