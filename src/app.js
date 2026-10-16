@@ -1,6 +1,6 @@
 import { drawObstacle, obstacleFootprint, obstacleEntrySide, tunnelPath } from './obstacle-icons.js?v=agility-number-drag-20261016';
 (()=>{'use strict';
-const $=s=>document.querySelector(s), canvas=$('#courseCanvas'),ctx=canvas.getContext('2d'),frame=$('#frame'),canvasWrap=$('#canvasWrap'),obstacleContext=$('#obstacleContext'),obstacleContextBody=$('#obstacleContextBody'),obstacleProp=$('#obstacleProp');
+const $=s=>document.querySelector(s), canvas=$('#courseCanvas'),ctx=canvas.getContext('2d'),frame=$('#frame'),canvasWrap=$('#canvasWrap'),obstacleContext=$('#obstacleContext'),obstacleContextBody=$('#obstacleContextBody'),obstacleProp=$('#obstacleProp');obstacleContextBody.hidden=true;
 const boardLogoImage=document.querySelector('.board-logo img');
 const names={jump:'Skok pojedynczy',spread:'Skok podwójny',wall:'Murek',longJump:'Skok w dal',tire:'Koło',aFrame:'Palizada A',dogWalk:'Kładka',seesaw:'Huśtawka',tunnel:'Tunel otwarty',weave:'Slalom'};
 let state={title:'Mój pierwszy tor',length:40,width:24,gridSize:2,unit:'m',bg:'#f3eefb',ob:'#59456f',path:'#8b5cf6',grid:true,showRoute:true,showNumbers:true,showLooseNumbers:true,showLooseNumbers2:false,showDistances:false,obstacles:[],route:[],routeBends:{},markers:[],selected:null,selectedMarker:null,tool:'select',zoom:100,view:'2d',courses:[],activeCourseId:null};
