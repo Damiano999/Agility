@@ -262,7 +262,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     let pineIndex=0,canopyIndex=0;
     treePositions.forEach(([x,z],i)=>{
       const height=4.4+random()*3.5,isBroadleaf=i%3===0;
-      temp.position.set(x,-.4+height/2,z);temp.scale.set(1,height,1);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();trunks.setMatrixAt(i,temp.matrix);
+      const trunkHeight=height*(isBroadleaf?.74:.92);temp.position.set(x,-.4+trunkHeight/2,z);temp.scale.set(1,trunkHeight,1);temp.rotation.set(0,random()*Math.PI,0);temp.updateMatrix();trunks.setMatrixAt(i,temp.matrix);
       trunks.setColorAt(i,new THREE.Color(isBroadleaf?'#705037':'#62472f'));
       const radius=1.35+random()*.8;
       if(isBroadleaf){
