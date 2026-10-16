@@ -65,3 +65,9 @@
 .sidebar-collapse[open]>summary.card-title{margin-bottom:12px}
 .sidebar-collapse>.collapse-content{min-width:0}
 @media(max-width:850px){.sidebar-section{margin-bottom:10px}.sidebar-collapse{margin-bottom:10px}}
+
+/* Draw disclosure chevrons as shapes, not text glyphs */
+.sidebar-section>summary::after,.sidebar-collapse>summary::after{content:"";width:7px;height:7px;right:7px;top:50%;border-right:2px solid #cbb9dc;border-bottom:2px solid #cbb9dc;border-radius:1px;transform:translateY(-65%) rotate(45deg);font-size:0;line-height:0}
+.sidebar-section[open]>summary::after,.sidebar-collapse[open]>summary::after{transform:translateY(-35%) rotate(225deg)}
+.sidebar-section>summary,.sidebar-collapse>summary{min-height:24px}
+.sidebar-collapse>summary.card-title{padding-right:24px}
