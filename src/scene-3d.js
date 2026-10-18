@@ -36,7 +36,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   const floorGroup = new THREE.Group(), obstacleGroup = new THREE.Group(), routeGroup = new THREE.Group(), markerGroup = new THREE.Group();
   scene.add(floorGroup, routeGroup, obstacleGroup, markerGroup);
   const forestGroup = new THREE.Group(); scene.add(forestGroup);
-  let forestAnimals=[],pondDucks=[],animalAnimationTimer=null;
+  let pondDucks=[],duckAnimationTimer=null;
 
   function addBox(group, color, x, y, z, w, h, d, options = {}) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, options.roughness ?? .72, options.metalness ?? 0));
@@ -355,73 +355,10 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     }
     const rail=mat('#b58a5d');
     const backRail=new THREE.Mesh(new THREE.BoxGeometry(.12,.12,seatLength),rail);backRail.position.set(L/2+7,1.55,0);forestGroup.add(backRail);
-    forestAnimals=[];
-    const sphereGeometry=new THREE.SphereGeometry(1,10,8),legGeometry=new THREE.CylinderGeometry(.045,.06,.4,6),earGeometry=new THREE.ConeGeometry(.1,.22,5),antlerGeometry=new THREE.CylinderGeometry(.025,.045,.42,5);
-    const addPart=(parent,geometry,color,position,scale)=>{
-      const mesh=new THREE.Mesh(geometry,mat(color,.86));mesh.position.set(...position);mesh.scale.set(...scale);mesh.castShadow=false;parent.add(mesh);return mesh;
-    };
-    const species=[
-      {kind:'dog',coat:'#c58b52',dark:'#493322',scale:1,speed:1.25},
-      {kind:'dog',coat:'#e8dfcf',dark:'#51453f',scale:.92,speed:1.5},
-      {kind:'deer',coat:'#a96f43',dark:'#513925',scale:1.25,speed:1.7},
-      {kind:'rabbit',coat:'#b9aaa0',dark:'#6e5c56',scale:.72,speed:1.05},
-      {kind:'rabbit',coat:'#eee5d8',dark:'#b87983',scale:.68,speed:1.2},
-      {kind:'fox',coat:'#c86d36',dark:'#493126',scale:.9,speed:1.45}
-    ];
-    for(let index=0;index<species.length;index++){
-      const spec=species[index],root=new THREE.Group(),legs=[];
-      if(spec.kind==='deer'){
-        addPart(root,sphereGeometry,spec.coat,[0,.69,0],[.52,.27,.27]);
-        addPart(root,sphereGeometry,spec.coat,[.31,.91,0],[.18,.38,.17]);
-        addPart(root,sphereGeometry,spec.coat,[.46,1.13,0],[.22,.2,.18]);
-        for(const side of [-1,1]){
-          const ear=addPart(root,earGeometry,spec.dark,[.34,1.22,side*.18],[.55,1.1,.55]);ear.rotation.z=-.65;
-          const horn=addPart(root,antlerGeometry,'#6a4a32',[.43,1.38,side*.11],[.7,1,.7]);horn.rotation.z=-.25;
-          for(const branch of [-1,1]){const tine=addPart(root,antlerGeometry,'#6a4a32',[.42+branch*.1,1.53,side*.16],[.42,.65,.42]);tine.rotation.z=branch*.55}
-        }
-      }else if(spec.kind==='rabbit'){
-        addPart(root,sphereGeometry,spec.coat,[-.05,.48,0],[.34,.25,.25]);
-        addPart(root,sphereGeometry,spec.coat,[.29,.57,0],[.2,.19,.18]);
-        addPart(root,sphereGeometry,'#fff3e9',[.47,.51,0],[.09,.07,.09]);
-        addPart(root,sphereGeometry,'#fff8f0',[-.36,.52,0],[.1,.1,.1]);
-        for(const side of [-1,1]){const ear=addPart(root,sphereGeometry,spec.dark,[.25,.84,side*.09],[.065,.27,.055]);ear.rotation.z=-.16}
-      }else{
-        addPart(root,sphereGeometry,spec.coat,[0,.58,0],[.5,.25,.27]);
-        addPart(root,sphereGeometry,spec.coat,[.39,.69,0],[.23,.23,.2]);
-        addPart(root,sphereGeometry,spec.dark,[.57,.61,0],[.15,.1,.13]);
-        for(const side of [-1,1]){const ear=addPart(root,earGeometry,spec.dark,[.32,.88,side*.13],[.75,1,.68]);ear.rotation.z=-.2}
-        if(spec.kind==='fox'){
-          addPart(root,sphereGeometry,spec.coat,[-.58,.7,0],[.34,.16,.17]);
-          addPart(root,sphereGeometry,'#f3eadf',[-.84,.71,0],[.13,.13,.13]);
-        }else{
-          const tail=addPart(root,legGeometry,spec.coat,[-.5,.72,0],[.6,1,.6]);tail.rotation.z=-1;
-        }
-      }
-      const legY=spec.kind==='deer'?.43:spec.kind==='rabbit'?.32:.39,legLength=spec.kind==='deer'?.52:spec.kind==='rabbit'?.28:.4;
-      for(const x of [-.29,.29])for(const z of [-.16,.16]){
-        const pivot=new THREE.Group();pivot.position.set(x,legY,z);
-        const leg=addPart(pivot,legGeometry,spec.dark,[0,-legLength/2,0],[.9,legLength/.4,.9]);root.add(pivot);legs.push(pivot);
-      }
-      root.scale.setScalar(spec.scale);root.userData.walk={legs,phase:random(),speed:spec.speed*(.82+random()*.36),route:[]};
-      const hx=L/2+2.2,hz=W/2+2.2,route=[],point=(x,z)=>({x,z});
-      route.push(point(-hx-random()*3,-hz-random()*3),point((random()-.5)*L,-hz-random()*4),point(hx+random()*3,-hz-random()*3),point(hx+random()*4,(random()-.5)*W),point(hx+random()*3,hz+random()*3),point((random()-.5)*L,hz+random()*4),point(-hx-random()*3,hz+random()*3),point(-hx-random()*4,(random()-.5)*W));
-      if(index%2)route.reverse();
-      const lengths=route.map((p,i)=>{const q=route[(i+1)%route.length];return Math.hypot(q.x-p.x,q.z-p.z)}),totalLength=lengths.reduce((sum,value)=>sum+value,0);
-      root.userData.walk.route=route;root.userData.walk.lengths=lengths;root.userData.walk.totalLength=totalLength;root.position.set(route[0].x,-.4,route[0].z);
-      forestGroup.add(root);forestAnimals.push(root);
-    }
-    if(!animalAnimationTimer)animalAnimationTimer=window.setInterval(()=>{
+    if(!duckAnimationTimer)duckAnimationTimer=window.setInterval(()=>{
       if(document.visibilityState==='hidden'||!canvas.isConnected||!canvas.clientWidth||getState().view!=='3d')return;
       const now=performance.now()*.001;
       for(const duck of pondDucks){const swim=duck.userData.swim;if(!swim)continue;duck.position.set(swim.homeX+Math.sin(now*swim.speed+swim.phase)*.42,-.34+Math.sin(now*2+swim.phase)*.025,swim.homeZ+Math.cos(now*swim.speed*.7+swim.phase)*.24);duck.rotation.y=Math.atan2(Math.cos(now*swim.speed+swim.phase),Math.sin(now*swim.speed+swim.phase))}
-      for(const animal of forestAnimals){
-        const walk=animal.userData.walk;if(!walk)continue;
-        const distance=(now*walk.speed+walk.phase*walk.totalLength)%walk.totalLength;let d=distance,segment=0;
-        while(segment<walk.lengths.length-1&&d>walk.lengths[segment]){d-=walk.lengths[segment];segment++}
-        const a=walk.route[segment],b=walk.route[(segment+1)%walk.route.length],t=d/walk.lengths[segment],x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t,yaw=Math.atan2(-(b.z-a.z),b.x-a.x);
-        animal.position.set(x,-.4+Math.abs(Math.sin(now*6+walk.phase))*.025,z);animal.rotation.y=yaw;
-        walk.legs.forEach((leg,index)=>{leg.rotation.z=Math.sin(now*7+walk.phase+(index%2)*Math.PI)*.32});
-      }
       renderer.render(scene,camera);
     },80);
     forestGroup.userData.signature=`${L}|${W}`;
@@ -635,6 +572,6 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('wheel', e => { distance = Math.max(10, Math.min(130, distance * (e.deltaY > 0 ? 1.08 : .92))); update(getState()); clearTimeout(wheelTimeout); wheelTimeout = setTimeout(onDone, 400); e.preventDefault(); }, { passive: false });
   const observer = new ResizeObserver(() => update(getState())); observer.observe(canvas.parentElement);
-  return { update, renderer, dispose() { observer.disconnect(); clearGroup(obstacleGroup); clearGroup(routeGroup); clearGroup(floorGroup); clearGroup(forestGroup); if(animalAnimationTimer)clearInterval(animalAnimationTimer); forestAnimals=[]; pondDucks=[]; renderer.dispose(); } };
+  return { update, renderer, dispose() { observer.disconnect(); clearGroup(obstacleGroup); clearGroup(routeGroup); clearGroup(floorGroup); clearGroup(forestGroup); if(duckAnimationTimer)clearInterval(duckAnimationTimer); pondDucks=[]; renderer.dispose(); } };
 }
 
