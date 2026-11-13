@@ -8,10 +8,11 @@ const obstacleColors = {
 
 export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRotate, onEditNumber, onMoveNumber, onEditMarker, onAddMarker, onDone, onError }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.autoUpdate = false;
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); onError('Utracono kontekst grafiki 3D. Przełącz na 2D i ponów próbę.'); });
   canvas.addEventListener('webglcontextrestored', () => update(getState()));
 
@@ -24,10 +25,10 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
   let azimuth = .72, elevation = .78, distance = 52;
   const hemi = new THREE.HemisphereLight('#f5ffe9', '#687568', 2.3); scene.add(hemi);
   const sun = new THREE.DirectionalLight('#fff4d8', 3.2); sun.position.set(-16, 28, 18); sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -40; sun.shadow.camera.right = 40; sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40; scene.add(sun);
+  sun.shadow.mapSize.set(1024, 1024); sun.shadow.autoUpdate = false; sun.shadow.camera.left = -40; sun.shadow.camera.right = 40; sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40; scene.add(sun);
   const fill = new THREE.DirectionalLight('#8ce1dc', 1.0); fill.position.set(18, 12, -16); scene.add(fill);
   const matCache = new Map();
-  let routeBuildSignature = '', markerBuildSignature = '';
+  let routeBuildSignature = '', markerBuildSignature = '', shadowBuildSignature = '';
   const mat = (color, roughness = .72, metalness = 0) => {
     const key = `${color}-${roughness}-${metalness}`;
     if (!matCache.has(key)) matCache.set(key, new THREE.MeshStandardMaterial({ color, roughness, metalness }));
@@ -460,6 +461,8 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     const L = (Number(s.length) || 40) * unitScale, W = (Number(s.width) || 24) * unitScale;
     if(forestGroup.userData.signature!==`${L}|${W}`)buildForest(s,L,W);
     const visibleCourses=(Array.isArray(s.courses)&&s.courses.length?s.courses:[{id:s.activeCourseId||'main',obstacles:s.obstacles,route:s.route,routeBends:s.routeBends,color:s.path,visible:true}]).filter(course=>course.visible!==false),liveIds=new Set(),obstacleGroups=new Map(obstacleGroup.children.map(child=>[child.userData.obstacleId,child]));
+    const shadowSignature=JSON.stringify([L,W,visibleCourses.map(course=>[course.id,(course.obstacles||s.obstacles||[]).map(obstacle=>[obstacle.id,obstacle.type,obstacle.x,obstacle.y,obstacle.rotation,obstacle.height,obstacle.length,obstacle.bend,obstacle.poleCount])])]);
+    if(shadowSignature!==shadowBuildSignature){sun.shadow.needsUpdate=true;shadowBuildSignature=shadowSignature}
     for (const course of visibleCourses) for (const obstacle of course.obstacles||s.obstacles) {
       const courseState={...s,activeCourseId:course.id,obstacles:course.obstacles||s.obstacles,route:course.route||[],routeBends:course.routeBends||{},path:course.color||s.path};
       liveIds.add(obstacle.id);
