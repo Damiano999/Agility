@@ -462,7 +462,7 @@ export function createScene3D({ canvas, getState, onSelect, onMove, onBend, onRo
     if(forestGroup.userData.signature!==`${L}|${W}`)buildForest(s,L,W);
     const visibleCourses=(Array.isArray(s.courses)&&s.courses.length?s.courses:[{id:s.activeCourseId||'main',obstacles:s.obstacles,route:s.route,routeBends:s.routeBends,color:s.path,visible:true}]).filter(course=>course.visible!==false),liveIds=new Set(),obstacleGroups=new Map(obstacleGroup.children.map(child=>[child.userData.obstacleId,child]));
     const shadowSignature=JSON.stringify([L,W,visibleCourses.map(course=>[course.id,(course.obstacles||s.obstacles||[]).map(obstacle=>[obstacle.id,obstacle.type,obstacle.x,obstacle.y,obstacle.rotation,obstacle.height,obstacle.length,obstacle.bend,obstacle.poleCount])])]);
-    if(shadowSignature!==shadowBuildSignature){sun.shadow.needsUpdate=true;shadowBuildSignature=shadowSignature}
+    if(shadowSignature!==shadowBuildSignature){sun.shadow.needsUpdate=true;renderer.shadowMap.needsUpdate=true;shadowBuildSignature=shadowSignature}
     for (const course of visibleCourses) for (const obstacle of course.obstacles||s.obstacles) {
       const courseState={...s,activeCourseId:course.id,obstacles:course.obstacles||s.obstacles,route:course.route||[],routeBends:course.routeBends||{},path:course.color||s.path};
       liveIds.add(obstacle.id);
